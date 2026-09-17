@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ccot"
+version = "0.1.0"
+description = "CCOT consultant rota: allocation engine and admin tools"
+requires-python = ">=3.9"
+dependencies = ["ortools>=9.8", "openpyxl>=3.1", "cryptography>=41"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+ccot = "ccot.cli:main"
+
+[tool.setuptools]
+packages = ["ccot"]
+
+[tool.setuptools.package-data]
+ccot = ["*.json"]

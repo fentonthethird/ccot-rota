@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: ccot
+Version: 0.1.0
+Summary: CCOT consultant rota: allocation engine and admin tools
+Requires-Python: >=3.9
+Requires-Dist: ortools>=9.8
+Requires-Dist: openpyxl>=3.1
+Requires-Dist: cryptography>=41
+Provides-Extra: test
+Requires-Dist: pytest>=7; extra == "test"

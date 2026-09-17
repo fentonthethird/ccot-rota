@@ -1,0 +1,2 @@
+[console_scripts]
+ccot = ccot.cli:main

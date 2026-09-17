@@ -1,0 +1,10 @@
+#!/bin/sh
+# Admin command line. Uses the engine's own virtualenv.
+here="$(cd "$(dirname "$0")" && pwd)"
+py="$here/engine/.venv/bin/python"
+if [ ! -x "$py" ]; then
+  echo "engine/.venv is missing. Create it with:" >&2
+  echo "  python3 -m venv \"$here/engine/.venv\" && \"$here/engine/.venv/bin/pip\" install -e \"$here/engine[test]\"" >&2
+  exit 1
+fi
+exec "$py" -m ccot "$@"

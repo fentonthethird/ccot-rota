@@ -275,7 +275,7 @@ footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
   function renderSummary() {
     const m = data.summary.current, w = m.wli;
     const tiles = [
-      ['Extra shifts to date', w.locum_shifts.total + ' (+' + w.bank_holiday_shifts + ' BH)'],
+      ['Extra shifts allocated', w.locum_shifts.total + ' (+' + w.bank_holiday_shifts + ' BH)'],
       ['WLI spend to date', gbp(w.spend_to_date)],
       ['Committed this year', gbp(w.committed)],
       ['Projected for the year', gbp(w.projected)],

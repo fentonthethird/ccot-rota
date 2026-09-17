@@ -1,0 +1,12 @@
+# Python
+engine/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# macOS
+.DS_Store
+# Admin data must never be committed: this repository is public.
+data/
+*.enc.local
+# Local scratch
+scratch/

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CCOT rota</title>
+<meta name="theme-color" content="#005eb8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CCOT">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<header class="top" id="top">
+  <div class="inner">
+    <div class="row1">
+      <h1 id="title">CCOT rota</h1>
+      <span class="who" id="who"></span>
+    </div>
+    <div class="stats">
+      <div class="stat" id="statWd"><b id="wdCount">0</b>weekdays marked<br><span id="wdOwe"></span></div>
+      <div class="stat" id="statWe"><b id="weCount">0</b>weekend days marked<br><span id="weOwe"></span></div>
+    </div>
+    <div class="sub"><span id="deadline"></span><span id="bhLine"></span></div>
+  </div>
+</header>
+
+<main>
+  <div id="banner" class="banner" hidden></div>
+  <p class="hint" id="hint">Tap the days you can do CCOT. Tap again to unmark. Your answers are saved on this phone as you go.</p>
+  <div id="months" class="months"></div>
+  <p class="hint small">Bank holidays are marked <span class="bhkey">BH</span>. They never count towards your job plan, and are paid as extra shifts.</p>
+  <p class="hint small" id="lastCode"></p>
+</main>
+
+<footer class="bar">
+  <button id="allOn" type="button">All<br>available</button>
+  <button id="allOff" type="button">All<br>unavailable</button>
+  <button id="getCode" type="button" class="primary">Get my code</button>
+</footer>
+
+<div id="toast" class="toast" hidden><span id="toastMsg"></span><button id="toastUndo" type="button">Undo</button></div>
+
+<dialog id="codeDlg" aria-labelledby="codeTitle">
+  <h2 id="codeTitle">Your availability code</h2>
+  <p class="muted small" id="codeSummary"></p>
+  <div class="code" id="codeText"></div>
+  <div class="actions">
+    <button id="copyBtn" type="button" class="primary">Copy code</button>
+    <button id="shareBtn" type="button" hidden>Share…</button>
+    <a id="mailBtn" href="#">Email it</a>
+  </div>
+  <p class="muted small" id="codeNote"></p>
+  <button id="closeDlg" type="button" class="linkbtn">Close</button>
+</dialog>
+
+<script src="./calendar.js"></script>
+<script src="./codec.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

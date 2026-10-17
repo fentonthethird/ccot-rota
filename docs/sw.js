@@ -1,6 +1,6 @@
 /* Service worker: precaches the app shell so the app opens offline once it has loaded.
    Bump VERSION on every deploy so installed copies pick up the new files. */
-const VERSION = 'ccot-2026-09-17a';
+const VERSION = 'ccot-20261017-233347';
 const SHELL = [
   './', './index.html', './app.css', './app.js', './codec.js', './calendar.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'

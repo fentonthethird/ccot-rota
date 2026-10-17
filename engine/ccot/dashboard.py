@@ -146,6 +146,6 @@ def bump_service_worker(sw_path: Path) -> str:
     """Give the service worker a new version string so installed copies refresh."""
     text = sw_path.read_text(encoding="utf-8")
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    new = re.sub(r"const VERSION = '[^']*';", "const VERSION = 'ccot-%s';" % stamp, text, count=1)
+    new = re.sub(r"const VERSION = PREFIX \+ '[^']*';", "const VERSION = PREFIX + '%s';" % stamp, text, count=1)
     sw_path.write_text(new, encoding="utf-8")
     return stamp

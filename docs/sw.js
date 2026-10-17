@@ -1,6 +1,7 @@
 /* Service worker: precaches the app shell so the app opens offline once it has loaded.
    Bump VERSION on every deploy so installed copies pick up the new files. */
-const VERSION = 'ccot-20261017-233347';
+const PREFIX = 'ccot-live-';  // other sites on this origin use other prefixes; never touch their caches
+const VERSION = PREFIX + '20261017-234644';
 const SHELL = [
   './', './index.html', './app.css', './app.js', './codec.js', './calendar.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'
@@ -12,7 +13,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => (k.startsWith(PREFIX) || /^ccot-\d/.test(k)) && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

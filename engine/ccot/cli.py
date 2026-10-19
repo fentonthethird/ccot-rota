@@ -34,6 +34,10 @@ def _table(rows: List[List[Any]], head: List[str]) -> str:
     return "\n".join([line(head), line(["-" * w for w in widths])] + [line(r) for r in rows])
 
 
+def _limit(v) -> str:
+    return "no limit" if not v else "at most %d shifts" % v
+
+
 def _current_year() -> str:
     return cal.job_plan_year(dt.date.today())
 
@@ -148,8 +152,8 @@ def cmd_window(a, st: Store):
             rem = W.remaining_quota(st, w, c)
             ov = (w.get("allowances") or {}).get(c["initials"]) or {}
             sub = (w.get("submissions") or {}).get(c["initials"])
-            rows.append([c["initials"], "yes" if c.get("active", True) else "no", "%d/%d" % (rem["weekday"], rem["weekend"]), "%d/%d" % (al["weekday"], al["weekend"]), "set" if ov else "", sub["available"] if sub else "-"])
-        print(_table(rows, ["ini", "active", "owed wd/we", "allowance wd/we", "override", "offered"]))
+            rows.append([c["initials"], "yes" if c.get("active", True) else "no", "%d/%d" % (rem["weekday"], rem["weekend"]), "%d/%d" % (al["weekday"], al["weekend"]), "set" if ov else "", sub["available"] if sub else "-", (sub.get("max") or "none") if sub else "-"])
+        print(_table(rows, ["ini", "active", "owed wd/we", "allowance wd/we", "override", "offered", "max wanted"]))
         print("allowance = what they still owe, spread over the %d window(s) left this year; change with `ccot window allowance`" % W.windows_left(w))
     elif a.action == "allowance":
         W.set_allowance(st, a.id, a.initials, a.weekday, a.weekend)
@@ -188,9 +192,9 @@ def cmd_import(a, st: Store):
         text = sys.stdin.read()
     rep = importer.import_text(st, a.id, text)
     for r in rep["accepted"]:
-        print("accepted  %s: %d dates offered, %d weekends together" % (r["initials"], r["available"], r["pairs"]))
+        print("accepted  %s: %d dates offered, %d weekends together, %s" % (r["initials"], r["available"], r["pairs"], _limit(r.get("max"))))
     for r in rep["replaced"]:
-        print("replaced  %s: %d dates offered, %d weekends together (newer code replaces the earlier one)" % (r["initials"], r["available"], r["pairs"]))
+        print("replaced  %s: %d dates offered, %d weekends together, %s (newer code replaces the earlier one)" % (r["initials"], r["available"], r["pairs"], _limit(r.get("max"))))
     for r in rep["rejected"]:
         print("REJECTED  %s: %s" % (r["code"], r["error"]))
     print()
@@ -200,7 +204,8 @@ def cmd_import(a, st: Store):
 def cmd_status(a, st: Store):
     s = importer.status(st, a.id)
     print("window %s, deadline %s, status %s" % (s["window"], s["deadline"] or "none", s["status"]))
-    print("submitted (%d): %s" % (len(s["submitted"]), ", ".join("%s (%d)" % (x["initials"], x["available"]) for x in s["submitted"]) or "nobody"))
+    print("submitted (%d): %s" % (len(s["submitted"]), ", ".join("%s (%d%s)" % (x["initials"], x["available"], ", max %d" % x["max"] if x.get("max") else "") for x in s["submitted"]) or "nobody"))
+    print("  (numbers are dates offered; 'max' is the most shifts that person wants this window)")
     print("missing (%d):   %s" % (len(s["missing"]), ", ".join("%s %s" % (x["initials"], x["name"]) for x in s["missing"]) or "nobody"))
     if s["inactive_submitted"]:
         print("inactive consultants who submitted: %s" % ", ".join(s["inactive_submitted"]))
@@ -241,9 +246,16 @@ def _print_review(wid: str, d: Dict[str, Any], st: Store):
     f = d["fill"]
     print("fill: weekdays %d/%d, weekend days %d/%d, bank holidays %d/%d" % (
         f["weekday"]["filled"], f["weekday"]["total"], f["weekend"]["filled"], f["weekend"]["total"], f["bh"]["filled"], f["bh"]["total"]))
-    if d["unfillable"]:
-        print("UNFILLABLE (nobody available): " + ", ".join(dt.date.fromisoformat(x).strftime("%a %d %b") for x in d["unfillable"]))
-    else:
+    held = {h["date"]: h["offered_by"] for h in d.get("held_back_by_limits", [])}
+    nobody = [x for x in d["unfillable"] if x not in held]
+    if nobody:
+        print("UNFILLABLE (nobody available): " + ", ".join(dt.date.fromisoformat(x).strftime("%a %d %b") for x in nobody))
+    if held:
+        print("UNFILLED BECAUSE OF SHIFT LIMITS (everyone who offered has reached the most shifts they asked for):")
+        for x, who in sorted(held.items()):
+            print("  %s  offered by %s" % (dt.date.fromisoformat(x).strftime("%a %d %b"), ", ".join(who)))
+        print("  ask one of them whether they will do one more, then `ccot override DATE INITIALS --reason ...`")
+    if not d["unfillable"]:
         print("every date is covered")
     print("\nobjectives:")
     for s in d["stages"]:
@@ -260,13 +272,13 @@ def _print_review(wid: str, d: Dict[str, Any], st: Store):
     for ini, c in sorted(d["consultants"].items(), key=lambda kv: -kv[1]["allocated"]):
         if not c["submitted"] and not c["allocated"]:
             continue
-        rows.append([ini, c["offered"], c["allocated"],
+        rows.append([ini, c["offered"], c.get("max") or "", c["allocated"],
                      "%d+%d=%d/%d" % (c["jp_before"]["weekday"], c["jp_window"]["weekday"], c["jp_after"]["weekday"], c["quota"]["weekday"]),
                      "%d+%d=%d/%d" % (c["jp_before"]["weekend"], c["jp_window"]["weekend"], c["jp_after"]["weekend"], c["quota"]["weekend"]),
                      "%d/%d" % (c["allowance"]["weekday"], c["allowance"]["weekend"]),
                      "%d+%d=%d" % (c["locum_before"], c["locum_window"], c["locum_after"])])
     print("\nper consultant (JP columns: before + this window = after / annual quota):")
-    print(_table(rows, ["ini", "offered", "got", "JP weekday", "JP weekend", "allow wd/we", "locum before+new=after"]))
+    print(_table(rows, ["ini", "offered", "max", "got", "JP weekday", "JP weekend", "allow wd/we", "locum before+new=after"]))
     missing = [ini for ini, c in d["consultants"].items() if not c["submitted"] and c["active"]]
     if missing:
         print("\nno code received (treated as unavailable): " + ", ".join(missing))
@@ -360,7 +372,7 @@ def cmd_publish(a, st: Store):
 # ---------------------------------------------------------------- parser
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ccot", description="CCOT consultant rota: admin tools and allocation engine.")
-    p.add_argument("--data", help="data folder (default: $CCOT_DATA or ~/Documents/CCOT Rota Data)")
+    p.add_argument("--data", help="data folder (default: $CCOT_DATA or ~/Documents/Claude/CCOT Rota App/CCOT Rota Data)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("init", help="create the data folder, optionally seeded from the existing workbook")

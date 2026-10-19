@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 ccot/__init__.py
 ccot/__main__.py
@@ -22,3 +23,9 @@ ccot.egg-info/dependency_links.txt
 ccot.egg-info/entry_points.txt
 ccot.egg-info/requires.txt
 ccot.egg-info/top_level.txt
+tests/test_calendar.py
+tests/test_codec.py
+tests/test_costing.py
+tests/test_solver.py
+tests/test_workbook_real.py
+tests/test_workflow.py

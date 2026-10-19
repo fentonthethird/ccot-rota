@@ -29,11 +29,11 @@ def test_round_trip_many_seeds():
 
 
 def test_quarter_code_is_short():
-    code = codec.encode(**make(length=92))
+    code = codec.encode(**make(length=92), max_shifts=6)
     prefix, body = code.split("-")
-    assert prefix == "AWB" and len(body) == 33 and len(code) == 37
+    assert prefix == "AWB" and len(body) == 35 and len(code) == 39  # 92 days with a limit; 90 days gives 38
     year = codec.encode(**make(length=365, start=dt.date(2026, 4, 1)))
-    assert len(year) <= 100
+    assert len(year) <= 105  # a whole year still fits in a message
 
 
 def test_decode_is_forgiving_about_case_spacing_and_lookalikes():
@@ -94,20 +94,21 @@ def test_javascript_encoder_and_decoder_match_python(tmp_path):
     vectors = []
     for seed in range(25):
         v = make(seed, length=(seed * 13) % 200 + 1, start=dt.date(2026, 4, 1) + dt.timedelta(days=seed * 11), initials=["AW", "AWB", "Q"][seed % 3], token=["7f3a9c", "", "00ff"][seed % 3])
-        vectors.append({"initials": v["initials"], "start": v["start"].isoformat(), "len": len(v["days"]), "days": v["days"], "pairs": v["pairs"], "token": v["token"], "python": codec.encode(**v)})
+        mx = [None, 4, 90][seed % 3]
+        vectors.append({"initials": v["initials"], "start": v["start"].isoformat(), "len": len(v["days"]), "days": v["days"], "pairs": v["pairs"], "token": v["token"], "max": mx, "python": codec.encode(**v, max_shifts=mx)})
     js = """
 load(%r);
 const C = globalThis.CCOTCodec;
 const vectors = %s;
 const out = [];
 for (const v of vectors) {
-  const code = C.encode({ initials: v.initials, start: v.start, len: v.len, days: v.days, pairs: v.pairs, token: v.token });
+  const code = C.encode({ initials: v.initials, start: v.start, len: v.len, days: v.days, pairs: v.pairs, max: v.max, token: v.token });
   const d = C.decode(v.python, { token: v.token });
   let err = null;
   try { C.decode(v.python.slice(0, -2), { token: v.token }); } catch (e) { err = e.message; }
   let err2 = null;
   try { C.decode(v.python, { token: 'abcd' }); } catch (e) { err2 = e.message; }
-  out.push({ js: code, days: d.days, pairs: d.pairs, initials: d.initials, start: d.start, truncated: err, wrongToken: err2 });
+  out.push({ js: code, days: d.days, pairs: d.pairs, initials: d.initials, start: d.start, max: d.max, truncated: err, wrongToken: err2 });
 }
 print(JSON.stringify(out));
 """ % (str(DOCS / "codec.js"), json.dumps(vectors))
@@ -118,6 +119,37 @@ print(JSON.stringify(out));
     for v, o in zip(vectors, out):
         assert o["js"] == v["python"], "JS and Python encoders differ for %s" % v
         assert o["days"] == v["days"] and o["pairs"] == v["pairs"] and o["initials"] == v["initials"] and o["start"] == v["start"]
+        assert o["max"] == v["max"]
         assert "truncated" in (o["truncated"] or "") or "too short" in (o["truncated"] or "")
         if v["token"] != "abcd":
             assert "checksum" in (o["wrongToken"] or "")
+
+
+def test_most_shifts_wanted_round_trips_and_blank_means_no_limit():
+    v = make(11)
+    assert codec.decode(codec.encode(**v), v["token"]).max_shifts is None
+    for mx in (1, 6, 90, codec.MAX_LEN):
+        p = codec.decode(codec.encode(**v, max_shifts=mx), v["token"])
+        assert p.max_shifts == mx and p.days == v["days"] and p.pairs == v["pairs"]
+    with pytest.raises(codec.CodeError):
+        codec.encode(**v, max_shifts=codec.MAX_LEN + 1)
+
+
+def test_version_1_codes_are_still_read():
+    # Made on the live site in September 2026, before the limit existed.
+    p = codec.decode("AWB-23E4490PGRR000000000000000000Q360", "715268")
+    assert p.version == 1 and p.max_shifts is None
+    assert [d.isoformat() for d in p.available_dates()] == ["2027-01-04", "2027-01-05", "2027-01-09", "2027-01-10"]
+    with pytest.raises(codec.CodeError):
+        codec.decode("AWB-23E4490PGRR000000000000000000Q361", "715268")
+
+
+def test_a_corrupted_limit_is_detected():
+    v = make(12)
+    code = codec.encode(**v, max_shifts=6)
+    prefix, body = code.split("-")
+    # characters 9-10 of the body carry the limit bits
+    for i in (8, 9, 10):
+        bad = prefix + "-" + body[:i] + ("2" if body[i] != "2" else "3") + body[i + 1:]
+        with pytest.raises(codec.CodeError):
+            codec.decode(bad, v["token"])

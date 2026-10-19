@@ -59,6 +59,8 @@
   const pairSlots = new Set(Codec.pairSlots(id.s, len));
   const pairs = new Set((Array.isArray(saved.pairs) ? saved.pairs : []).filter((p) => pairSlots.has(p)));
   const meta = { lastCode: saved.lastCode || null, lastCodeAt: saved.lastCodeAt || null };
+  // Most shifts wanted this window. 0 = no limit (only limited by the days marked).
+  let maxWanted = Number.isInteger(saved.max) && saved.max > 0 ? Math.min(saved.max, len) : 0;
 
   const dateAt = (i) => startMs + i * DAY;
   const inWin = (i) => i >= 0 && i < len;
@@ -66,7 +68,7 @@
   const isWE = (i) => dow(dateAt(i)) >= 5;
 
   function persist() {
-    save(key, { days: Array.from(days).join(''), pairs: [...pairs].sort((a, b) => a - b), lastCode: meta.lastCode, lastCodeAt: meta.lastCodeAt, updatedAt: Date.now() });
+    save(key, { days: Array.from(days).join(''), pairs: [...pairs].sort((a, b) => a - b), max: maxWanted || null, lastCode: meta.lastCode, lastCodeAt: meta.lastCodeAt, updatedAt: Date.now() });
   }
   function snapshot() { return { days: Uint8Array.from(days), pairs: new Set(pairs) }; }
   function restore(snap) { days.set(snap.days); pairs.clear(); snap.pairs.forEach((p) => pairs.add(p)); persist(); renderAll(); }
@@ -102,6 +104,8 @@
     $('#statWd').classList.toggle('ok', id.jw > 0 && c.wd >= id.jw);
     $('#statWe').classList.toggle('ok', id.je > 0 && c.we >= id.je);
     $('#bhLine').textContent = c.bh ? '+ ' + c.bh + ' bank holiday' + (c.bh > 1 ? 's' : '') : '';
+    $('#maxLine').textContent = maxWanted ? 'At most ' + maxWanted + ' shift' + (maxWanted === 1 ? '' : 's') : '';
+    renderLimit(c);
     $('#deadline').textContent = id.d ? 'Send your code by ' + fmt(utc(id.d), { weekday: 'short', day: 'numeric', month: 'short' }) : '';
     const banner = $('#banner');
     if (id.d && Date.now() > utc(id.d) + DAY) {
@@ -112,6 +116,42 @@
       ? 'You last made a code on ' + fmt(meta.lastCodeAt, { weekday: 'short', day: 'numeric', month: 'short' }) + ' at ' + new Date(meta.lastCodeAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + '. If you have changed anything since, make a new one and send it again.'
       : '';
   }
+
+  /* ---------- most shifts wanted ---------- */
+  function renderLimit(c) {
+    c = c || counts();
+    const input = $('#maxShifts');
+    if (document.activeElement !== input) input.value = maxWanted ? String(maxWanted) : '';
+    $('#maxDown').disabled = maxWanted <= 1;
+    $('#maxUp').disabled = maxWanted >= len;
+    $('#maxClear').hidden = !maxWanted;
+    const marked = c.wd + c.we + c.bh;
+    const owed = id.jw + id.je;
+    let hint;
+    if (!maxWanted) hint = 'Leave blank for no limit: you could be given any of the days you mark.';
+    else {
+      hint = 'You will be given no more than ' + maxWanted + ' shift' + (maxWanted === 1 ? '' : 's') + ', however many days you mark.';
+      if (owed && maxWanted < owed) hint += ' That is fewer than the ' + owed + ' job plan shift' + (owed === 1 ? '' : 's') + ' you still owe this year.';
+      if (marked < maxWanted) hint += ' You have marked ' + marked + ' day' + (marked === 1 ? '' : 's') + ' so far.';
+    }
+    $('#maxHint').textContent = hint;
+  }
+  function setMax(v) {
+    v = Math.floor(Number(v) || 0);
+    maxWanted = v <= 0 ? 0 : Math.min(v, len);
+    persist();
+    renderHeader();
+  }
+  $('#maxShifts').addEventListener('input', (ev) => {
+    const digits = ev.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+    if (digits !== ev.target.value) ev.target.value = digits;
+    setMax(digits);
+  });
+  $('#maxShifts').addEventListener('blur', () => renderLimit());
+  $('#maxShifts').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ev.target.blur(); });
+  $('#maxUp').addEventListener('click', () => setMax((maxWanted || 0) + 1));
+  $('#maxDown').addEventListener('click', () => { if (maxWanted > 1) setMax(maxWanted - 1); });
+  $('#maxClear').addEventListener('click', () => setMax(0));
 
   /* ---------- month grids ---------- */
   function monthStarts() {
@@ -254,7 +294,7 @@
 
   /* ---------- the code ---------- */
   function makeCode() {
-    return Codec.encode({ initials: id.c, start: id.s, len, days, pairs: [...pairs].filter((p) => days[p] && days[p + 1]), token: id.k });
+    return Codec.encode({ initials: id.c, start: id.s, len, days, pairs: [...pairs].filter((p) => days[p] && days[p + 1]), max: maxWanted, token: id.k });
   }
   function shareText(code) { return 'CCOT availability ' + windowLabel() + ' (' + id.c + '): ' + code; }
   $('#getCode').addEventListener('click', () => {
@@ -266,7 +306,7 @@
     parts.push(c.wd + ' weekday' + (c.wd === 1 ? '' : 's'));
     parts.push(c.we + ' weekend day' + (c.we === 1 ? '' : 's'));
     if (c.bh) parts.push(c.bh + ' bank holiday' + (c.bh === 1 ? '' : 's'));
-    $('#codeSummary').textContent = 'You have marked ' + parts.join(', ') + ' available' + (c.together ? ', with ' + c.together + ' weekend' + (c.together === 1 ? '' : 's') + ' kept together' : '') + '.' + (c.wd + c.we + c.bh === 0 ? ' Sending this tells ' + ADMIN_NAME + ' you cannot do any dates this quarter.' : '');
+    $('#codeSummary').textContent = 'You have marked ' + parts.join(', ') + ' available' + (c.together ? ', with ' + c.together + ' weekend' + (c.together === 1 ? '' : 's') + ' kept together' : '') + '.' + (c.wd + c.we + c.bh === 0 ? ' Sending this tells ' + ADMIN_NAME + ' you cannot do any dates this quarter.' : (maxWanted ? ' You want no more than ' + maxWanted + ' shift' + (maxWanted === 1 ? '' : 's') + ' in total.' : ' No limit on the number of shifts.'));
     $('#codeText').textContent = code;
     $('#codeNote').textContent = 'Send it to ' + ADMIN_NAME + (id.d ? ' by ' + fmt(utc(id.d), { weekday: 'long', day: 'numeric', month: 'long' }) : '') + '. If you change anything later, make a new code and send that. The latest code counts.';
     const subject = 'CCOT availability ' + id.c + ' ' + windowLabel();

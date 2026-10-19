@@ -10,3 +10,8 @@ data/
 *.enc.local
 # Local scratch
 scratch/
+
+# local-only folders kept out of iCloud sync
+.git.nosync
+engine/.venv.nosync/
+engine/.venv

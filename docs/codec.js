@@ -1,10 +1,11 @@
-/* CCOT preference code, schema version 1.
+/* CCOT preference code, schema version 2 (version 1 codes are still read).
 
    Bit layout, most significant bit first:
-     4   schema version (1)
+     4   schema version (2)
      15  initials, three letters, A=1 .. Z=26, 0 = blank
      14  window start, days since 2024-01-01
      9   window length in days (1 .. 511)
+     9   most shifts wanted in the window, 0 = no limit   (version 2 only)
      N   one bit per day of the window, 1 = available
      P   one bit per weekend whose Saturday and Sunday are both inside the window,
          in date order, 1 = keep both days together
@@ -22,7 +23,8 @@
   const EPOCH_ISO = '2024-01-01';
   const EPOCH = Date.UTC(2024, 0, 1);
   const DAY = 86400000;
-  const VERSION = 1;
+  const VERSION = 2;
+  const READS = [1, 2];
   const MAX_LEN = 511;
   const HEADER_BITS = 4 + 15 + 14 + 9;
 
@@ -96,7 +98,7 @@
     return bits;
   }
 
-  /* o = { initials, start (ISO), len, days (array of 0/1, length len), pairs (Saturday indices), token (hex) } */
+  /* o = { initials, start (ISO), len, days (array of 0/1, length len), pairs (Saturday indices), max (most shifts wanted, 0 or empty = no limit), token (hex) } */
   function encode(o) {
     const start = dayNumber(o.start);
     const len = o.len | 0;
@@ -107,11 +109,14 @@
     const pairs = new Set(o.pairs || []);
     for (const p of pairs) if (slots.indexOf(p) < 0) throw new Error('pair flag ' + p + ' is not a Saturday inside the window');
     const ini = encodeInitials(o.initials);
+    const max = o.max ? Math.floor(Number(o.max)) : 0;
+    if (!(max >= 0 && max <= MAX_LEN)) throw new Error('most shifts wanted must be 0 to ' + MAX_LEN);
     const bits = [];
     pushBits(bits, VERSION, 4);
     bits.push(...ini.bits);
     pushBits(bits, start, 14);
     pushBits(bits, len, 9);
+    pushBits(bits, max, 9);
     for (let i = 0; i < len; i++) bits.push(o.days[i] ? 1 : 0);
     for (const s of slots) bits.push(pairs.has(s) ? 1 : 0);
     const crc = crc16(bitsToBytes(bits).concat(hexToBytes(o.token)));
@@ -120,7 +125,7 @@
     return ini.ini + '-' + base32Encode(bits);
   }
 
-  /* Returns { version, initials, start, end, len, days, pairs, pairSlots }. Throws with a plain message on any problem. */
+  /* Returns { version, initials, start, end, len, max (null = no limit), days, pairs, pairSlots }. Throws with a plain message on any problem. */
   function decode(code, o) {
     o = o || {};
     let raw = String(code || '').replace(/[‐-―−]/g, '-').trim();
@@ -132,7 +137,7 @@
     const bits = base32Decode(body);
     let pos = 0;
     const version = readBits(bits, pos, 4); pos += 4;
-    if (version !== VERSION) throw new Error('unknown code version ' + version + ' (expected ' + VERSION + ')');
+    if (READS.indexOf(version) < 0) throw new Error('unknown code version ' + version + ' (expected ' + READS.join(' or ') + ')');
     let initials = '';
     for (let i = 0; i < 3; i++) {
       const v = readBits(bits, pos, 5); pos += 5;
@@ -143,6 +148,8 @@
     const start = readBits(bits, pos, 14); pos += 14;
     const len = readBits(bits, pos, 9); pos += 9;
     if (len < 1) throw new Error('corrupt code (window length is zero)');
+    let max = 0;
+    if (version >= 2) { max = readBits(bits, pos, 9); pos += 9; }
     const startIso = isoFromDayNumber(start);
     const slots = pairSlots(startIso, len);
     const total = pos + len + slots.length + 16;
@@ -159,7 +166,7 @@
     for (; pos < bits.length; pos++) if (bits[pos]) throw new Error('corrupt code (padding)');
     if (crc !== want) throw new Error('checksum failed: the code was damaged in transit or was made from a different link');
     if (prefix && prefix !== initials) throw new Error('prefix ' + prefix + ' does not match the initials inside the code (' + initials + ')');
-    return { version, initials, start: startIso, end: isoFromDayNumber(start + len - 1), len, days, pairs, pairSlots: slots };
+    return { version, initials, start: startIso, end: isoFromDayNumber(start + len - 1), len, max: max || null, days, pairs, pairSlots: slots };
   }
 
   root.CCOTCodec = { encode, decode, pairSlots, dayNumber, isoFromDayNumber, crc16, VERSION, ALPHABET, EPOCH_ISO, MAX_LEN };

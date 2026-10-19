@@ -20,6 +20,11 @@ booking window; the site itself has no roster.
 The admin tool (`ccot links`) generates these. The app remembers the last link on the device, so
 the installed home screen app opens with no parameters and still knows who it is.
 
+Availability, weekend pairs and the optional "most shifts I want this quarter" limit are saved to
+`localStorage` on every change. Blank means no limit. The limit travels inside the code (schema
+version 2) and the engine never gives that person more shifts in the window. Version 1 codes,
+made before the limit existed, are still accepted and mean no limit.
+
 Availability is saved to `localStorage` on every tap. The code is produced by `codec.js`; the
 format is documented at the top of that file.
 

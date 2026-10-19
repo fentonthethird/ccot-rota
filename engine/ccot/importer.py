@@ -35,10 +35,10 @@ def import_text(store: Store, wid: str, text: str) -> Dict[str, Any]:
             continue
         sub = {"code": code, "received": dt.datetime.now().isoformat(timespec="seconds"),
                "days": "".join(str(v) for v in p.days), "pairs": p.pairs,
-               "available": sum(p.days)}
+               "available": sum(p.days), "max": p.max_shifts}
         existed = ini in w.setdefault("submissions", {})
         w["submissions"][ini] = sub
-        (report["replaced"] if existed else report["accepted"]).append({"initials": ini, "available": sum(p.days), "pairs": len(p.pairs)})
+        (report["replaced"] if existed else report["accepted"]).append({"initials": ini, "available": sum(p.days), "pairs": len(p.pairs), "max": p.max_shifts})
     store.save_window(w)
     return report
 
@@ -50,7 +50,7 @@ def status(store: Store, wid: str) -> Dict[str, Any]:
     inactive = [c for c in R.consultants(store) if not c.get("active", True)]
     out = {
         "window": wid, "deadline": w.get("deadline"), "status": w.get("status"),
-        "submitted": [{"initials": c["initials"], "name": c["name"], "available": subs[c["initials"]]["available"], "received": subs[c["initials"]]["received"]} for c in active if c["initials"] in subs],
+        "submitted": [{"initials": c["initials"], "name": c["name"], "available": subs[c["initials"]]["available"], "max": subs[c["initials"]].get("max"), "received": subs[c["initials"]]["received"]} for c in active if c["initials"] in subs],
         "missing": [{"initials": c["initials"], "name": c["name"]} for c in active if c["initials"] not in subs],
         "inactive_submitted": [c["initials"] for c in inactive if c["initials"] in subs],
     }

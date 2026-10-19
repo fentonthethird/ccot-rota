@@ -25,13 +25,24 @@
       <div class="stat" id="statWd"><b id="wdCount">0</b>weekdays marked<br><span id="wdOwe"></span></div>
       <div class="stat" id="statWe"><b id="weCount">0</b>weekend days marked<br><span id="weOwe"></span></div>
     </div>
-    <div class="sub"><span id="deadline"></span><span id="bhLine"></span></div>
+    <div class="sub"><span id="deadline"></span><span id="bhLine"></span><span id="maxLine"></span></div>
   </div>
 </header>
 
 <main>
   <div id="banner" class="banner" hidden></div>
   <p class="hint" id="hint">Tap the days you can do CCOT. Tap again to unmark. Your answers are saved on this phone as you go.</p>
+  <section class="limit" aria-labelledby="limitLabel">
+    <div class="limit-row">
+      <label id="limitLabel" for="maxShifts">Most shifts I want this quarter</label>
+      <div class="stepper">
+        <button type="button" id="maxDown" aria-label="One fewer shift">−</button>
+        <input id="maxShifts" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="No limit" aria-describedby="maxHint">
+        <button type="button" id="maxUp" aria-label="One more shift">+</button>
+      </div>
+    </div>
+    <p class="limit-hint"><span id="maxHint"></span> <button type="button" id="maxClear" class="linkish" hidden>Remove limit</button></p>
+  </section>
   <div id="months" class="months"></div>
   <p class="hint small">Bank holidays are marked <span class="bhkey">BH</span>. They never count towards your job plan, and are paid as extra shifts.</p>
   <p class="hint small" id="lastCode"></p>

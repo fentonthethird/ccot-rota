@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DEFAULT_DIR = Path.home() / "Documents" / "CCOT Rota Data"
+DEFAULT_DIR = Path.home() / "Documents" / "Claude" / "CCOT Rota App" / "CCOT Rota Data"
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "admin": {"name": "Adam", "email": "a.woodman-bailey@nhs.net"},

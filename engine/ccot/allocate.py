@@ -23,6 +23,13 @@ def build_problem(store: Store, w: Dict[str, Any], time_limit: float = 60.0) -> 
     for ini, sub in (w.get("submissions") or {}).items():
         available[ini] = {start + dt.timedelta(days=i) for i, ch in enumerate(sub["days"]) if ch == "1"} & set(open_dates)
         pairs[ini] = {start + dt.timedelta(days=i) for i in sub.get("pairs", [])}
+    # Stated maximum shifts for the window. Dates in the window already held (set by override before
+    # allocation) count towards it.
+    max_shifts: Dict[str, int] = {}
+    for ini, sub in (w.get("submissions") or {}).items():
+        if sub.get("max"):
+            held = sum(1 for d in dates if Y.holder(y, d) == ini)
+            max_shifts[ini] = max(0, int(sub["max"]) - held)
     consultants = [c["initials"] for c in R.consultants(store) if c["initials"] in available]
     offers = {d: [c for c in consultants if d in available[c]] for d in open_dates}
     allowance: Dict[str, Dict[str, int]] = {}
@@ -47,7 +54,7 @@ def build_problem(store: Store, w: Dict[str, Any], time_limit: float = 60.0) -> 
         h = Y.holder(y, d)
         if h:
             prior[d] = h
-    return Problem(dates=open_dates, consultants=consultants, available=available, pairs=pairs,
+    return Problem(dates=open_dates, consultants=consultants, available=available, pairs=pairs, max_shifts=max_shifts,
                    allowance=allowance, locum_ytd=locum_ytd, prior=prior, time_limit=time_limit)
 
 
@@ -88,6 +95,7 @@ def run(store: Store, wid: str, time_limit: float = 60.0) -> Dict[str, Any]:
         per[ini] = {
             "name": c["name"], "active": c.get("active", True), "submitted": ini in (w.get("submissions") or {}),
             "offered": len(p.available.get(ini, ())), "allocated": len(got),
+            "max": ((w.get("submissions") or {}).get(ini) or {}).get("max"),
             "quota": {"weekday": qw, "weekend": qe},
             "jp_before": before, "jp_window": jpw,
             "jp_after": {t: before[t] + jpw[t] for t in ("weekday", "weekend")},
@@ -114,6 +122,8 @@ def run(store: Store, wid: str, time_limit: float = 60.0) -> Dict[str, Any]:
         "kinds": {d.isoformat(): kinds[d] for d in p.dates if res.assignment[d]},
         "unfillable": [d.isoformat() for d in res.unfillable],
         "no_offers": [d.isoformat() for d in p.dates if not res.offers[d]],
+        # offered by someone, but everyone who offered had reached the most shifts they asked for
+        "held_back_by_limits": [{"date": d.isoformat(), "offered_by": res.offers[d]} for d in res.unfillable if res.offers[d]],
         "pair_violations": [{"c": c, "saturday": s.isoformat()} for c, s in res.pair_violations],
         "stages": stages,
         "satisfied": satisfied,

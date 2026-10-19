@@ -122,3 +122,24 @@ def test_results_are_deterministic():
     p = problem(ds, avail, {c: (3, 1) for c in "ABCDEFG"}, ytd={c: i for i, c in enumerate("ABCDEFG")})
     a, b = solve(p), solve(p)
     assert a.assignment == b.assignment
+
+
+def test_stated_maximum_is_never_exceeded_and_others_fill_the_rest():
+    ds = days(14)
+    res = solve(problem(ds, {"A": ds, "B": ds}, {"A": (10, 2), "B": (0, 0)}, max_shifts={"A": 3}))
+    got_a = [d for d in ds if res.assignment[d] == "A"]
+    assert len(got_a) == 3 and res.jp["A"]["weekday"] + res.jp["A"]["weekend"] == 3
+    assert res.unfillable == [] and all(res.assignment[d] for d in ds)
+
+
+def test_maximum_can_leave_a_date_unfilled_and_it_is_reported():
+    ds = days(5)
+    res = solve(problem(ds, {"A": ds}, {"A": (5, 0)}, max_shifts={"A": 2}))
+    assert sum(1 for d in ds if res.assignment[d] == "A") == 2
+    assert len(res.unfillable) == 3 and all(res.offers[d] == ["A"] for d in res.unfillable)
+
+
+def test_no_maximum_means_only_availability_limits():
+    ds = days(7)
+    res = solve(problem(ds, {"A": ds}, {"A": (5, 2)}, max_shifts={}))
+    assert all(res.assignment[d] == "A" for d in ds)

@@ -9,7 +9,8 @@ Stages, each solved to optimality and then fixed before the next:
   5  minimise runs of more than `max_run` consecutive days
   6  minimise extra shifts for one consultant in the same week (spreads shifts out)
   7  deterministic tie-break so the same inputs always give the same draft
-Hard constraints: only dates a consultant marked available; one consultant per date.
+Hard constraints: only dates a consultant marked available; one consultant per date; never more
+shifts in the window than the consultant's own stated maximum, when they gave one.
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ class Problem:
     allowance: Dict[str, Dict[str, int]]      # {c: {"weekday": n, "weekend": n}}
     locum_ytd: Dict[str, int]                 # locum shifts (incl. bank holidays) already this year
     prior: Dict[dt.date, str] = field(default_factory=dict)  # holders of dates just before the window
+    max_shifts: Dict[str, int] = field(default_factory=dict)  # most new shifts each consultant will take; absent = no limit
     max_run: int = 4
     time_limit: float = 60.0
     seed: int = 0
@@ -69,6 +71,11 @@ def solve(p: Problem) -> Result:
     for d in p.dates:
         if offers[d]:
             m.Add(sum(x[c, d] for c in offers[d]) <= 1)
+    # each consultant's own limit on how many shifts they want in this window
+    for c, cap in p.max_shifts.items():
+        terms = [x[c, d] for d in p.dates if (c, d) in x]
+        if terms and cap is not None and cap < len(terms):
+            m.Add(sum(terms) <= max(0, int(cap)))
 
     # job plan shifts delivered, per consultant and day type, capped by the window allowance
     n: Dict[Tuple[str, str], object] = {}

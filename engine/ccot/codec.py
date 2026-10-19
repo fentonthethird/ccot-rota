@@ -7,11 +7,12 @@ from __future__ import annotations
 import datetime as dt
 import re
 from dataclasses import dataclass
-from typing import Iterable, List, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 EPOCH = dt.date(2024, 1, 1)
-VERSION = 1
+VERSION = 2
+READS = (1, 2)
 MAX_LEN = 511
 HEADER_BITS = 4 + 15 + 14 + 9
 _DASHES = "‐‑‒–—―−"
@@ -94,6 +95,7 @@ class Payload:
     days: List[int]
     pairs: List[int]  # indices of flagged Saturdays
     version: int = VERSION
+    max_shifts: Optional[int] = None  # most shifts wanted in the window; None = no limit
 
     @property
     def end(self) -> dt.date:
@@ -110,7 +112,7 @@ class Payload:
         return [self.start + dt.timedelta(days=i) for i in self.pairs]
 
 
-def encode(initials: str, start: dt.date, days: Sequence[int], pairs: Iterable[int] = (), token: str = "") -> str:
+def encode(initials: str, start: dt.date, days: Sequence[int], pairs: Iterable[int] = (), token: str = "", max_shifts: Optional[int] = None) -> str:
     ini = (initials or "").upper()
     if not re.fullmatch(r"[A-Z]{1,3}", ini):
         raise CodeError("initials must be 1 to 3 letters")
@@ -125,12 +127,16 @@ def encode(initials: str, start: dt.date, days: Sequence[int], pairs: Iterable[i
     bad = pairset - set(slots)
     if bad:
         raise CodeError("pair flag %s is not a Saturday inside the window" % sorted(bad)[0])
+    mx = int(max_shifts or 0)
+    if not 0 <= mx <= MAX_LEN:
+        raise CodeError("most shifts wanted must be 0 to %d" % MAX_LEN)
     bits: List[int] = []
     _push(bits, VERSION, 4)
     for i in range(3):
         _push(bits, ord(ini[i]) - 64 if i < len(ini) else 0, 5)
     _push(bits, sn, 14)
     _push(bits, length, 9)
+    _push(bits, mx, 9)
     bits.extend(1 if v else 0 for v in days)
     bits.extend(1 if s in pairset else 0 for s in slots)
     crc = crc16(_bits_to_bytes(bits) + _token_bytes(token))
@@ -155,8 +161,8 @@ def _header(code: str):
     pos = 0
     version = _read(bits, pos, 4)
     pos += 4
-    if version != VERSION:
-        raise CodeError("unknown code version %d (expected %d)" % (version, VERSION))
+    if version not in READS:
+        raise CodeError("unknown code version %d (expected %s)" % (version, " or ".join(map(str, READS))))
     initials = ""
     for _ in range(3):
         v = _read(bits, pos, 5)
@@ -173,7 +179,11 @@ def _header(code: str):
     pos += 9
     if length < 1:
         raise CodeError("corrupt code (window length is zero)")
-    return prefix, body, bits, pos, initials, date_from_day_number(start), length
+    mx = 0
+    if version >= 2:
+        mx = _read(bits, pos, 9)
+        pos += 9
+    return prefix, body, bits, pos, initials, date_from_day_number(start), length, version, mx
 
 
 def peek_initials(code: str) -> str:
@@ -182,7 +192,7 @@ def peek_initials(code: str) -> str:
 
 
 def decode(code: str, token: str = "") -> Payload:
-    prefix, body, bits, pos, initials, start, length = _header(code)
+    prefix, body, bits, pos, initials, start, length, version, mx = _header(code)
     slots = pair_slots(start, length)
     total = pos + length + len(slots) + 16
     expect = -(-total // 5)
@@ -206,7 +216,7 @@ def decode(code: str, token: str = "") -> Payload:
         raise CodeError("checksum failed: the code was damaged in transit or was made from a different link")
     if prefix and prefix != initials:
         raise CodeError("prefix %s does not match the initials inside the code (%s)" % (prefix, initials))
-    return Payload(initials=initials, start=start, length=length, days=days, pairs=pairs)
+    return Payload(initials=initials, start=start, length=length, days=days, pairs=pairs, version=version, max_shifts=mx or None)
 
 
 _CODE_RE = re.compile(r"(?<![0-9A-Za-z])([A-Za-z]{1,3})\s*[-%s]\s*([0-9A-Za-z]{9,120})(?![0-9A-Za-z])" % _DASHES)

@@ -11,7 +11,7 @@ engine/.venv/bin/pip install -e "engine[test]"
 ./ccot settings site-url https://YOUR-USER.github.io/ccot-rota/
 ```
 
-`init` creates the data folder (default `~/Documents/CCOT Rota Data`, or `$CCOT_DATA`, or `--data DIR`)
+`init` creates the data folder (default `~/Documents/Claude/CCOT Rota App/CCOT Rota Data`, or `$CCOT_DATA`, or `--data DIR`)
 and seeds the roster, quotas, this year's allocations and the Summary history from the workbook.
 Everything in that folder is plain JSON you can read and back up. It is outside the repository
 on purpose: the repository is public.
@@ -35,6 +35,9 @@ git add docs && git commit -m "Publish rota" && git push
 ```
 
 Consultants who have not sent a code by the time you run `allocate` are treated as unavailable.
+A consultant may also say the most shifts they want in the window; the allocation never goes over it.
+`ccot status` and `ccot review` show each limit, and the review lists any date left unfilled only
+because everyone who offered it had reached their limit.
 Import more codes and run `allocate` again as often as you like before `accept`.
 
 ## After publication

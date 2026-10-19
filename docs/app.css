@@ -35,6 +35,18 @@ main { padding: 8px 12px 0; }
 .banner { background: #fff3cd; color: #5c4400; border: 1px solid #ffe08a; border-radius: 8px; padding: 8px 10px; font-size: .88rem; margin: 4px 0 10px; }
 .bhkey { display: inline-block; background: var(--bh); color: var(--bh-text); font-size: .7rem; font-weight: 700; border-radius: 4px; padding: 0 4px; }
 
+/* Most shifts wanted */
+.limit { background: var(--card); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.limit-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.limit label { font-weight: 600; font-size: .95rem; }
+.stepper { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stepper button { width: 46px; min-height: 46px; border: 0; background: #f0f4f5; color: var(--blue); font-size: 1.4rem; font-weight: 700; padding: 0; }
+.stepper button:disabled { color: #aeb7bd; }
+.stepper input { width: 84px; border: 0; border-left: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; font: inherit; font-size: 1.1rem; font-weight: 700; color: var(--text); padding: 0 4px; -moz-appearance: textfield; }
+.stepper input::placeholder { font-size: .85rem; font-weight: 500; color: var(--muted); }
+.limit-hint { margin: 6px 0 0; font-size: .85rem; color: var(--muted); }
+.linkish { background: none; border: 0; color: var(--blue); text-decoration: underline; padding: 6px 2px; min-height: 36px; font-size: .85rem; }
+
 /* Month blocks */
 .month { background: var(--card); border-radius: var(--radius); padding: 10px 8px 8px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 .month > header { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 6px; }

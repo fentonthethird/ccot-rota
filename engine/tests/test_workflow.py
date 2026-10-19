@@ -158,3 +158,29 @@ def test_manual_allowance_override_is_respected(store):
     assert W.allowance(store, store.window(w["id"]), R.get(store, "AW")) == {"weekday": 8, "weekend": 1}
     W.set_allowance(store, w["id"], "AW", weekday=99)
     assert W.allowance(store, store.window(w["id"]), R.get(store, "AW"))["weekday"] == 10  # never more than is owed
+
+
+def test_shift_limit_travels_from_code_to_draft(store):
+    w = make_window(store)
+    start = D(w["start"])
+    n = W.length(w)
+    weekdays = [1 if (start + dt.timedelta(days=i)).weekday() < 5 else 0 for i in range(n)]
+    aw = codec.encode("AW", start, weekdays, token=w["tokens"]["AW"], max_shifts=4)
+    xw = codec.encode("XW", start, [1] * n, token=w["tokens"]["XW"])
+    rep = importer.import_text(store, w["id"], aw + "\n" + xw)
+    assert {r["initials"]: r["max"] for r in rep["accepted"]} == {"AW": 4, "XW": None}
+    assert store.window(w["id"])["submissions"]["AW"]["max"] == 4
+    st = importer.status(store, w["id"])
+    assert {x["initials"]: x["max"] for x in st["submitted"]} == {"AW": 4, "XW": None}
+    # a date in the window already given to AW by override counts towards the limit
+    Y.override(store, "2026-27", D("2027-01-05"), "AW", "agreed in advance")
+    assert allocate.build_problem(store, store.window(w["id"])).max_shifts == {"AW": 3}
+    draft = allocate.run(store, w["id"], time_limit=30)
+    assert draft["consultants"]["AW"]["allocated"] == 3 and draft["consultants"]["AW"]["max"] == 4
+    assert draft["unfillable"] == [] and draft["held_back_by_limits"] == []
+    # with XW gone, AW's limit leaves dates unfilled and the review explains why
+    rep = importer.import_text(store, w["id"], codec.encode("XW", start, [0] * n, token=w["tokens"]["XW"]))
+    draft = allocate.run(store, w["id"], time_limit=30)
+    held = {h["date"] for h in draft["held_back_by_limits"]}
+    assert draft["consultants"]["AW"]["allocated"] == 3
+    assert held and held <= set(draft["unfillable"]) and all(h["offered_by"] == ["AW"] for h in draft["held_back_by_limits"])

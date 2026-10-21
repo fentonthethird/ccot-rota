@@ -40,6 +40,13 @@ Two encrypted dashboards, each with its own passphrase. Both are built by `ccot 
 The consultant file is built separately and contains no locum totals, money or availability
 requests, so the consultant passphrase cannot reveal them. The admin passphrase must differ.
 
+## Address
+
+Served at https://www.pickmyrota.com/ (GitHub Pages custom domain, set by `docs/CNAME`).
+The bare pickmyrota.com and the old fentonthethird.github.io/ccot-rota/ address redirect there.
+DNS is at Porkbun: four A records for the bare domain to GitHub Pages, and `www` as a CNAME to
+fentonthethird.github.io.
+
 ## Deploying
 
 Push to `main`. GitHub Pages must be set to serve from the `docs/` folder. When you change any

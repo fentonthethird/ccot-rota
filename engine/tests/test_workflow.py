@@ -184,3 +184,24 @@ def test_shift_limit_travels_from_code_to_draft(store):
     held = {h["date"] for h in draft["held_back_by_limits"]}
     assert draft["consultants"]["AW"]["allocated"] == 3
     assert held and held <= set(draft["unfillable"]) and all(h["offered_by"] == ["AW"] for h in draft["held_back_by_limits"])
+
+
+def test_job_plan_credit_counts_as_done_and_is_logged(store, tmp_path):
+    add_people(store, {"AWB": ("Adam Woodman-Bailey", 14, 2), "SH": ("Sofia Hangar", 11, 2)})
+    y = store.year("2026-27")
+    Y.set_shift(y, D("2026-06-04"), "SH", Y.LOCUM, "import")
+    store.save_year(y)
+    Y.add_credit(store, "2026-27", "AWB", "weekday", 2, D("2026-06-05"), "Paternity leave 4/5 June counts as job plan")
+    y = store.year("2026-27")
+    assert Y.jp_done(y, "AWB") == {"weekday": 2, "weekend": 0}
+    assert Y.jp_done(y, "AWB", upto=D("2026-06-04")) == {"weekday": 0, "weekend": 0}  # dated, not retrospective
+    assert Y.counts(y)["AWB"]["jp_weekday"] == 2 and Y.counts(y)["AWB"]["total"] == 0  # no rota shift added
+    assert Y.locum_done(y, "SH")["total"] == 1  # the colleague who covered keeps their shift
+    w = W.create(store, "2026-27-Q4", D("2027-01-01"), D("2027-03-31"))
+    assert W.remaining_quota(store, w, R.get(store, "AWB")) == {"weekday": 12, "weekend": 2}
+    plain = dashboard.build_payload(store, "2026-27")
+    assert next(c for c in plain["consultants"] if c["initials"] == "AWB")["jp"]["weekday"] == 2
+    assert plain["changes"][-1]["event"] == "credit" and plain["changes"][-1]["n"] == 2
+    view = dashboard.build_view_payload(store, "2026-27") if hasattr(dashboard, "build_view_payload") else None
+    if view:
+        assert next(c for c in view["consultants"] if c["initials"] == "AWB")["jp"]["weekday"] == 2

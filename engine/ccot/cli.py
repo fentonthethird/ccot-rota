@@ -321,6 +321,19 @@ def cmd_kind(a, st: Store):
     print("%s: %s is now %s. Logged." % (a.date, s["c"], s["kind"]))
 
 
+def cmd_credit(a, st: Store):
+    label = cal.job_plan_year(a.date)
+    ini = a.initials.upper()
+    R.get(st, ini)
+    t = "weekday" if a.weekday else "weekend"
+    n = a.weekday or a.weekend
+    Y.add_credit(st, label, ini, t, n, a.date, a.reason)
+    done = Y.jp_done(st.year(label), ini)
+    qw, qe = R.quota(R.get(st, ini), label)
+    print("%s credited with %d job plan %s shift%s (dated %s). Job plan now %d/%d weekday, %d/%d weekend. Logged." % (
+        ini, n, t, "" if n == 1 else "s", a.date, done["weekday"], qw, done["weekend"], qe))
+
+
 def cmd_year(a, st: Store):
     label = a.year or _current_year()
     m = dashboard.year_metrics(st, label)
@@ -468,6 +481,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("to_initials")
     s.add_argument("--reason", required=True)
     s.set_defaults(fn=cmd_swap)
+
+    s = sub.add_parser("credit", help="count job plan shifts as done without a rota shift, e.g. lost to leave (logged)")
+    s.add_argument("initials")
+    g = s.add_mutually_exclusive_group(required=True)
+    g.add_argument("--weekday", type=int, help="number of weekday job plan shifts to credit (negative to undo)")
+    g.add_argument("--weekend", type=int, help="number of weekend job plan shifts to credit (negative to undo)")
+    s.add_argument("--date", type=_date, required=True, help="the date the credit relates to")
+    s.add_argument("--reason", required=True)
+    s.set_defaults(fn=cmd_credit)
 
     s = sub.add_parser("kind", help="reclassify a held shift as JP or LOCUM (logged)")
     s.add_argument("date", type=_date)

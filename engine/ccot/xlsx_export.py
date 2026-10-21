@@ -32,10 +32,10 @@ def _week_notes(year: Dict[str, Any]) -> Dict[str, List[str]]:
     for k, v in (year.get("notes") or {}).items():
         notes.setdefault(k, []).append(v)
     for e in year.get("log", []):
-        if e.get("event") in ("swap", "override", "reclassify") and e.get("date"):
+        if e.get("event") in ("swap", "override", "reclassify", "credit") and e.get("date"):
             d = dt.date.fromisoformat(e["date"])
             mon = (d - dt.timedelta(days=d.weekday())).isoformat()
-            who = e.get("c") or ("%s->%s" % (e.get("from_"), e.get("to")) if e.get("event") == "swap" else (e.get("after") or {}).get("c") if isinstance(e.get("after"), dict) else "")
+            who = ("%s +%s JP" % (e.get("c"), e.get("n"))) if e.get("event") == "credit" else e.get("c") or ("%s->%s" % (e.get("from_"), e.get("to")) if e.get("event") == "swap" else (e.get("after") or {}).get("c") if isinstance(e.get("after"), dict) else "")
             notes.setdefault(mon, []).append("%s %s %s: %s" % (d.strftime("%d/%m"), e["event"], who or "", e.get("reason", "")))
     return notes
 

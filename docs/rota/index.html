@@ -298,7 +298,7 @@ footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
   function renderChanges() {
     const ch = (data.changes || []).slice().reverse();
     if (!ch.length) { $('#changesTable').innerHTML = '<tbody><tr><td class="muted">No swaps or changes yet.</td></tr></tbody>'; return; }
-    const who = (e) => e.event === 'swap' ? esc(e.from_ + ' → ' + e.to) : e.event === 'reclassify' ? esc(e.c + ': ' + e.before + ' → ' + e.after) : esc((e.before && e.before.c ? e.before.c : 'unfilled') + ' → ' + (e.after && e.after.c ? e.after.c : 'unfilled'));
+    const who = (e) => e.event === 'credit' ? esc(e.c + ': ' + (e.n > 0 ? '+' : '') + e.n + ' job plan ' + e.type) : e.event === 'swap' ? esc(e.from_ + ' → ' + e.to) : e.event === 'reclassify' ? esc(e.c + ': ' + e.before + ' → ' + e.after) : esc((e.before && e.before.c ? e.before.c : 'unfilled') + ' → ' + (e.after && e.after.c ? e.after.c : 'unfilled'));
     $('#changesTable').innerHTML = '<thead><tr><th>Date</th><th>Change</th><th>Who</th><th>Reason</th><th>Logged</th></tr></thead><tbody>' + ch.map((e) => '<tr><td>' + fmt(e.date, { weekday: 'short', day: 'numeric', month: 'short' }) + '</td><td>' + esc(e.event) + '</td><td>' + who(e) + '</td><td>' + esc(e.reason || '') + '</td><td class="muted small">' + esc((e.at || '').slice(0, 10)) + '</td></tr>').join('') + '</tbody>';
   }
 

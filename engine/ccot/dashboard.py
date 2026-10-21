@@ -96,7 +96,7 @@ def build_payload(store: Store, label: str) -> Dict[str, Any]:
         w = store.window(wid)
         if w.get("year") == label:
             windows.append({"id": wid, "start": w["start"], "end": w["end"], "deadline": w.get("deadline"), "status": w.get("status")})
-    changes = [e for e in y.get("log", []) if e.get("event") in ("swap", "override", "reclassify")]
+    changes = [e for e in y.get("log", []) if e.get("event") in ("swap", "override", "reclassify", "credit")]
     history = store.history().get("years", {})
     return {
         "version": 1, "generated": dt.datetime.now().isoformat(timespec="seconds"),

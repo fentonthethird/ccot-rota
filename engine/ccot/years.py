@@ -39,7 +39,30 @@ def jp_done(year: Dict[str, Any], initials: str, upto: Optional[dt.date] = None)
             t = cal.day_type(dt.date.fromisoformat(s["date"]))
             if t in out:
                 out[t] += 1
+    for cr in credits_for(year, initials, upto):
+        out[cr["type"]] += int(cr["n"])
     return out
+
+
+def credits_for(year: Dict[str, Any], initials: str, upto: Optional[dt.date] = None) -> List[Dict[str, Any]]:
+    """Job plan shifts credited without a rota shift, e.g. a rostered shift lost to leave that the
+    job plan still counts as done."""
+    return [cr for cr in year.get("jp_credits", [])
+            if cr["c"] == initials and (upto is None or dt.date.fromisoformat(cr["date"]) <= upto)]
+
+
+def add_credit(store: Store, label: str, initials: str, day_type: str, n: int, d: dt.date, reason: str) -> Dict[str, Any]:
+    """Count n job plan shifts as done for a consultant, dated d. Logged and published."""
+    if day_type not in (cal.WEEKDAY, cal.WEEKEND):
+        raise ValueError("type must be weekday or weekend")
+    if n == 0:
+        raise ValueError("n must not be zero")
+    y = store.year(label)
+    cr = {"c": initials, "type": day_type, "n": int(n), "date": _iso(d), "reason": reason}
+    y.setdefault("jp_credits", []).append(cr)
+    log(y, "credit", date=_iso(d), c=initials, type=day_type, n=int(n), reason=reason)
+    store.save_year(y)
+    return y
 
 
 def locum_done(year: Dict[str, Any], initials: str, upto: Optional[dt.date] = None) -> Dict[str, int]:
@@ -159,4 +182,8 @@ def counts(year: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
             c["jp_" + t] += 1
         else:
             c["locum_" + t] += 1
+    for cr in year.get("jp_credits", []):
+        c = out.setdefault(cr["c"], {"jp_weekday": 0, "jp_weekend": 0, "locum_weekday": 0, "locum_weekend": 0, "bh": 0, "total": 0})
+        c["jp_" + cr["type"]] += int(cr["n"])
+        c["credited"] = c.get("credited", 0) + int(cr["n"])
     return out

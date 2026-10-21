@@ -121,13 +121,13 @@ def override(store: Store, label: str, d: dt.date, initials: Optional[str], reas
     return y
 
 
-def swap(store: Store, label: str, d: dt.date, from_initials: str, to_initials: str, reason: str) -> Dict[str, Any]:
+def swap(store: Store, label: str, d: dt.date, from_initials: str, to_initials: str, reason: str, kind: Optional[str] = None) -> Dict[str, Any]:
     """A consultant hands a published shift to a colleague. Logged; the log is published."""
     y = store.year(label)
     old = y.get("shifts", {}).get(_iso(d))
     if not old or old.get("c") != from_initials:
         raise ValueError("%s is not held by %s (held by %s)" % (_iso(d), from_initials, old.get("c") if old else "nobody"))
-    kind = default_kind(store, label, d, to_initials)
+    kind = kind or default_kind(store, label, d, to_initials)
     set_shift(y, d, to_initials, kind, "swap", note=reason)
     log(y, "swap", date=_iso(d), from_=from_initials, to=to_initials, kind_before=old["kind"], kind_after=kind, reason=reason)
     store.save_year(y)

@@ -309,7 +309,7 @@ def cmd_override(a, st: Store):
 
 def cmd_swap(a, st: Store):
     label = cal.job_plan_year(a.date)
-    y = Y.swap(st, label, a.date, a.from_initials.upper(), a.to_initials.upper(), a.reason)
+    y = Y.swap(st, label, a.date, a.from_initials.upper(), a.to_initials.upper(), a.reason, kind=a.kind)
     s = y["shifts"][a.date.isoformat()]
     print("%s: now %s (%s). Logged." % (a.date, s["c"], s["kind"]))
 
@@ -510,6 +510,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("from_initials")
     s.add_argument("to_initials")
     s.add_argument("--reason", required=True)
+    s.add_argument("--kind", choices=["JP", "LOCUM"], help="shift type for the new holder (default: job plan while they still owe it, else locum)")
     s.set_defaults(fn=cmd_swap)
 
     s = sub.add_parser("credit", help="count job plan shifts as done without a rota shift, e.g. lost to leave (logged)")

@@ -118,7 +118,7 @@ def test_import_status_heatmap_allocate_accept_and_publish(store, tmp_path):
 
     # publish: encrypted payload, no submissions inside, dashboard numbers consistent
     enc = tmp_path / "payload.enc"
-    payload = dashboard.publish(store, "2026-27", "correct horse", enc)
+    payload = dashboard.publish(store, "2026-27", "correct horse", enc, view="admin")
     env = json.loads(enc.read_text())
     assert set(env) == {"v", "kdf", "iter", "salt", "iv", "ct"}
     plain = json.loads(dashboard.decrypt(env, "correct horse"))
@@ -205,3 +205,42 @@ def test_job_plan_credit_counts_as_done_and_is_logged(store, tmp_path):
     view = dashboard.build_view_payload(store, "2026-27") if hasattr(dashboard, "build_view_payload") else None
     if view:
         assert next(c for c in view["consultants"] if c["initials"] == "AWB")["jp"]["weekday"] == 2
+
+
+def test_consultant_and_admin_dashboards(store, tmp_path):
+    add_people(store, {"AW": ("Alan Williams", 1, 0), "XW": ("Ximena Watson", 0, 0)})
+    w = W.create(store, "2026-27-Q4", D("2027-01-01"), D("2027-03-31"), D("2026-11-30"))
+    start, n = D(w["start"]), W.length(w)
+    first = codec.encode("AW", start, [1 if i < 10 else 0 for i in range(n)], token=w["tokens"]["AW"])
+    second = codec.encode("AW", start, [1 if i < 20 else 0 for i in range(n)], token=w["tokens"]["AW"])
+    xw = codec.encode("XW", start, [1] * n, token=w["tokens"]["XW"])
+    importer.import_text(store, w["id"], first)
+    importer.import_text(store, w["id"], first)            # the same code pasted twice is one version
+    importer.import_text(store, w["id"], second + "\n" + xw)
+    hist = store.window(w["id"])["history"]
+    assert [h["available"] for h in hist["AW"]] == [10, 20] and len(hist["XW"]) == 1
+    allocate.run(store, w["id"], time_limit=20)
+    allocate.accept(store, w["id"])
+    Y.swap(store, "2026-27", D("2027-01-04"), store.year("2026-27")["shifts"]["2027-01-04"]["c"], "XW", "childcare")
+
+    cons = dashboard.build_consultant_payload(store, "2026-27")
+    text = json.dumps(cons).lower()
+    for word in ('"summary":', '"locum":', '"wli":', '"requests":', '"budget":', '"total_wli_bill":', '"history":', '"days":'):
+        assert word not in text, word
+    assert set(cons["consultants"][0]) == {"initials", "name", "active", "quota", "jp", "complete", "shifts"}
+    assert {s["kind"] for s in cons["rota"].values()} <= {"JP", "LOCUM", "BH"}   # extra shifts still coloured
+    assert cons["changes"][-1]["reason"] == "childcare" and cons["decided_through"]
+
+    adm = dashboard.build_admin_payload(store, "2026-27")
+    assert adm["summary"]["current"]["wli"] and adm["consultants"][0]["locum"]
+    aw = adm["requests"]["AW"]
+    assert [(r["available"], r["current"]) for r in aw] == [(10, False), (20, True)]
+    assert aw[1]["window"] == "2026-27-Q4" and aw[1]["days"].startswith("1" * 20) and aw[1]["received"]
+
+    cdir, adir = tmp_path / "rota", tmp_path / "admin"
+    dashboard.publish(store, "2026-27", "consultants", cdir / "payload.enc", view="consultant")
+    dashboard.publish(store, "2026-27", "leadership", adir / "payload.enc", view="admin")
+    assert dashboard.opens(cdir / "payload.enc", "consultants") is True
+    assert dashboard.opens(cdir / "payload.enc", "leadership") is False
+    assert dashboard.opens(tmp_path / "nothing.enc", "x") is None
+    assert "requests" in json.loads(dashboard.decrypt(json.loads((adir / "payload.enc").read_text()), "leadership"))

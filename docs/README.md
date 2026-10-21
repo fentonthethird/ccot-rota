@@ -28,10 +28,17 @@ made before the limit existed, are still accepted and mean no limit.
 Availability is saved to `localStorage` on every tap. The code is produced by `codec.js`; the
 format is documented at the top of that file.
 
-## Dashboard (`rota/`)
+## Dashboards
 
-`rota/index.html` decrypts `rota/payload.enc` in the browser with the shared passphrase.
-The admin tool writes `payload.enc`; commit and push it to publish.
+Two encrypted dashboards, each with its own passphrase. Both are built by `ccot publish`.
+
+| Page | For | Shows |
+|---|---|---|
+| `rota/` "CCOT Consultant Rota" | all consultants | rota by month (job plan and extra colouring), job plan progress, notes, swaps and changes |
+| `admin/` "CCOT Consultant Rota Admin" | rota lead and senior leadership | everything above plus locum counts, Summary and WLI spend, and every availability code each consultant sent |
+
+The consultant file is built separately and contains no locum totals, money or availability
+requests, so the consultant passphrase cannot reveal them. The admin passphrase must differ.
 
 ## Deploying
 

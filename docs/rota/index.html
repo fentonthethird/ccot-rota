@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CCOT rota</title>
+<title>CCOT Consultant Rota</title>
 <meta name="theme-color" content="#005eb8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -34,7 +34,7 @@ section.panel { background:var(--card); border-radius:12px; padding:12px; margin
 section.panel h2 { margin:0 0 8px; font-size:1.05rem; }
 .muted { color:var(--muted); } .small { font-size:.85rem; }
 .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-.controls select { padding:8px; border-radius:8px; border:1px solid var(--line); min-height:40px; }
+.controls select { max-width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); min-height:40px; }
 .legend { display:flex; flex-wrap:wrap; gap:8px 14px; font-size:.8rem; color:var(--muted); margin:6px 0 10px; }
 .legend i { display:inline-block; width:14px; height:14px; border-radius:3px; border:1px solid var(--line); vertical-align:-2px; margin-right:4px; }
 .months { display:grid; gap:12px; }
@@ -80,7 +80,7 @@ footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
 </style>
 </head>
 <body>
-<header class="top"><h1>CCOT rota</h1><span class="yr" id="yearLabel"></span><button id="lockBtn" hidden>Lock</button></header>
+<header class="top"><h1>CCOT Consultant Rota</h1><span class="yr" id="yearLabel"></span><button id="lockBtn" hidden>Lock</button></header>
 <main>
   <section class="gate" id="gate">
     <h2>Enter the passphrase</h2>
@@ -95,7 +95,7 @@ footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
 
   <div id="app" hidden>
     <nav class="tabs" id="tabs">
-      <a href="#rota" class="on">Rota</a><a href="#jobplans">Job plans</a><a href="#locum">Locum shifts</a><a href="#summary">Summary</a><a href="#changes">Changes</a>
+      <a href="#rota" class="on">Rota</a><a href="#jobplans">Job plans</a><a href="#changes">Changes</a>
     </nav>
     <section class="panel" id="rota">
       <h2>Rota</h2>
@@ -111,19 +111,8 @@ footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
     </section>
     <section class="panel" id="jobplans">
       <h2>Job plans</h2>
-      <p class="muted small">Job plan shifts completed against each consultant's annual quota, and extra shifts undertaken this year.</p>
+      <p class="muted small">Job plan shifts completed against each consultant's annual quota.</p>
       <div class="scroll"><table id="jpTable"></table></div>
-    </section>
-    <section class="panel" id="locum">
-      <h2>Locum shifts this year</h2>
-      <p class="muted small" id="locumNote"></p>
-      <div id="locumChart" role="img" aria-label="Locum shifts per consultant"></div>
-    </section>
-    <section class="panel" id="summary">
-      <h2>Summary</h2>
-      <div class="tiles" id="wliTiles"></div>
-      <p class="muted small" id="wliNote"></p>
-      <div class="scroll"><table id="summaryTable"></table></div>
     </section>
     <section class="panel" id="changes">
       <h2>Swaps and changes since publication</h2>
@@ -192,11 +181,11 @@ footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
     me.innerHTML = '<option value="">nobody</option>' + consultantsShown().map((c) => '<option value="' + c.initials + '">' + esc(c.initials + ' · ' + c.name) + '</option>').join('');
     me.value = load('me') || '';
     me.onchange = () => { save('me', me.value); renderRota(); };
-    renderRota(); renderJobPlans(); renderLocum(); renderSummary(); renderChanges();
+    renderRota(); renderJobPlans(); renderChanges();
     $('#foot').textContent = 'Published ' + new Date(data.generated).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) + '. Preferences are never published, only outcomes. Questions or swap requests to ' + (data.admin.name || 'the rota lead') + '.';
   }
   function yearBounds() { const y = parseInt(data.year.slice(0, 4), 10); return [Date.UTC(y, 3, 1), Date.UTC(y + 1, 2, 31)]; }
-  function decidedThrough() { const m = data.summary.current.decided_through; return m ? utc(m) : -Infinity; }
+  function decidedThrough() { const m = data.decided_through; return m ? utc(m) : -Infinity; }
   function renderRota() {
     const meIni = $('#me').value;
     const [ys, ye] = yearBounds();
@@ -260,40 +249,9 @@ footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
       return '<tr><td><b>' + esc(c.initials) + '</b><br><span class="muted small">' + esc(c.name) + (c.active ? '' : ' (inactive)') + '</span></td>' +
         '<td class="num">' + c.jp.weekday + ' / ' + c.quota.weekday + bar(c.jp.weekday, c.quota.weekday) + '</td>' +
         '<td class="num">' + c.jp.weekend + ' / ' + c.quota.weekend + bar(c.jp.weekend, c.quota.weekend) + '</td>' +
-        '<td>' + status + '</td><td class="num">' + c.locum.weekday + '</td><td class="num">' + c.locum.weekend + '</td><td class="num">' + c.locum.bh + '</td><td class="num"><b>' + c.locum.total + '</b></td></tr>';
+        '<td>' + status + '</td></tr>';
     });
-    $('#jpTable').innerHTML = '<thead><tr><th>Consultant</th><th class="num">JP weekday</th><th class="num">JP weekend</th><th>Status</th><th class="num">Extra wd</th><th class="num">Extra we</th><th class="num">BH</th><th class="num">Extra total</th></tr></thead><tbody>' + rows.join('') + '</tbody>';
-  }
-  function renderLocum() {
-    const cs = consultantsShown().slice().sort((a, b) => b.locum.total - a.locum.total || a.initials.localeCompare(b.initials));
-    const max = Math.max(1, ...cs.map((c) => c.locum.total));
-    const total = cs.reduce((s, c) => s + c.locum.total, 0);
-    const meIni = load('me') || '';
-    $('#locumChart').innerHTML = cs.map((c) => '<div class="hbar" data-tip="' + esc(c.name + ': ' + c.locum.weekday + ' weekday, ' + c.locum.weekend + ' weekend, ' + c.locum.bh + ' bank holiday') + '"><span class="k">' + esc(c.initials) + '</span><div class="track"><div class="fill' + (c.initials === meIni ? ' mine' : '') + '" style="width:' + (100 * c.locum.total / max) + '%"></div></div><span class="v">' + c.locum.total + '</span></div>').join('');
-    $('#locumNote').textContent = total + ' extra shifts so far this year across ' + cs.length + ' consultants, average ' + (cs.length ? (total / cs.length).toFixed(1) : '0') + ' each. Bank holiday shifts are included. Differences reflect availability: shifts only go to people who offered the date.';
-  }
-  function renderSummary() {
-    const m = data.summary.current, w = m.wli;
-    const tiles = [
-      ['Extra shifts allocated', w.locum_shifts.total + ' (+' + w.bank_holiday_shifts + ' BH)'],
-      ['WLI spend to date', gbp(w.spend_to_date)],
-      ['Committed this year', gbp(w.committed)],
-      ['Projected for the year', gbp(w.projected)],
-    ];
-    let warn = false;
-    if (w.budget) { tiles.push(['Budget', gbp(w.budget)]); tiles.push(['Projected use of budget', w.budget_pct + '%']); warn = !!w.overspend; }
-    $('#wliTiles').innerHTML = tiles.map(([l, v], i) => '<div class="tile' + (warn && i >= 4 ? ' warn' : '') + '"><div class="lab">' + esc(l) + '</div><div class="val">' + esc(v) + '</div></div>').join('');
-    $('#wliNote').textContent = (warn ? '⚠ Projected spend exceeds the budget. ' : '') + 'WLI bill = extra weekday and weekend shifts at the rate in force on each date (' + gbp(w.rates.weekday.hourly * w.rates.weekday.hours) + ' weekday, ' + gbp(w.rates.weekend.hourly * w.rates.weekend.hours) + ' weekend today). Bank holiday shifts are paid separately and are not in the bill. The projection assumes the rest of the year needs extra shifts at the same rate as the part already allocated.';
-    const years = Object.keys(data.summary.history || {}).sort();
-    if (!years.includes(data.year)) years.push(data.year);
-    const rows = [
-      ['JP weekday shifts', 'jp_weekday_quota', (v) => v], ['JP weekend day shifts', 'jp_weekend_quota', (v) => v], ['JP bank holiday', 'jp_bank_holiday', (v) => v],
-      ['Bank available (budget)', 'budget', gbp], ['Weekday fill rate', 'weekday_fill_rate', pct], ['Weekend fill rate', 'weekend_fill_rate', pct], ['Bank holiday fill rate', 'bank_holiday_fill_rate', pct],
-      ['Weekday fill rate above JP', 'weekday_fill_rate_above_jp', pct], ['Weekend fill rate above JP', 'weekend_fill_rate_above_jp', pct], ['Total WLI bill', 'total_wli_bill', gbp],
-    ];
-    const get = (yr, key) => yr === data.year ? m[key] : (data.summary.history[yr] || {})[key];
-    $('#summaryTable').innerHTML = '<thead><tr><th></th>' + years.map((y) => '<th class="num">' + esc(y) + (y === data.year ? ' (to date)' : '') + '</th>').join('') + '</tr></thead><tbody>' +
-      rows.map(([lab, key, f]) => '<tr><td>' + esc(lab) + '</td>' + years.map((y) => { const v = get(y, key); return '<td class="num">' + (v == null ? '–' : esc(f(v))) + '</td>'; }).join('') + '</tr>').join('') + '</tbody>';
+    $('#jpTable').innerHTML = '<thead><tr><th>Consultant</th><th class="num">JP weekday</th><th class="num">JP weekend</th><th>Status</th></tr></thead><tbody>' + rows.join('') + '</tbody>';
   }
   function renderChanges() {
     const ch = (data.changes || []).slice().reverse();

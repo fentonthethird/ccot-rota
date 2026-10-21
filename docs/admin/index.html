@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CCOT Consultant Rota Admin</title>
+<meta name="theme-color" content="#005eb8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="icon" href="../icons/icon-192.png" type="image/png">
+<style>
+:root { --blue:#005eb8; --blue-dk:#003087; --bg:#f0f4f5; --card:#fff; --line:#d8dde0; --text:#212b32; --muted:#4c6272;
+  --locum:#c6e0b4; --locum-dk:#4c8a3f; --bh:#ffe066; --bh-dk:#8a6300; --red:#d5281b; --red-bg:#f7d4d0; --future:#f4f6f8; --green:#007f3b; --amber:#ed8b00; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.35; }
+button, select, input { font:inherit; }
+[hidden] { display:none !important; }
+.top { position:sticky; top:0; z-index:5; background:var(--blue); color:#fff; padding:calc(8px + env(safe-area-inset-top,0px)) 12px 8px; display:flex; align-items:center; gap:10px; }
+.top h1 { font-size:1.1rem; margin:0; flex:1; }
+.top .yr { opacity:.9; font-size:.9rem; }
+.top button { background:rgba(255,255,255,.18); border:0; color:#fff; border-radius:8px; padding:6px 10px; min-height:36px; }
+main { padding:10px 12px 40px; max-width:1100px; margin:0 auto; }
+.gate { max-width:420px; margin:40px auto; background:var(--card); border-radius:12px; padding:20px; }
+.gate input[type=password] { width:100%; padding:12px; border:1px solid var(--line); border-radius:8px; margin:8px 0; font-size:1rem; }
+.gate input[type=checkbox] { width:20px; height:20px; margin:0; }
+.gate button { width:100%; min-height:48px; border:0; border-radius:10px; background:var(--blue); color:#fff; font-weight:600; }
+.gate .err { color:var(--red); font-size:.9rem; min-height:1.2em; }
+.gate label { font-size:.9rem; color:var(--muted); display:flex; gap:8px; align-items:center; margin:6px 0 12px; }
+.tabs { display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; -webkit-overflow-scrolling:touch; position:sticky; top:calc(52px + env(safe-area-inset-top,0px)); background:var(--bg); z-index:4; }
+.tabs a { flex:none; text-decoration:none; color:var(--blue); background:#fff; border:1px solid var(--line); border-radius:20px; padding:8px 12px; font-size:.85rem; font-weight:600; }
+.tabs a.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+section.panel { background:var(--card); border-radius:12px; padding:12px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+section.panel h2 { margin:0 0 8px; font-size:1.05rem; }
+.muted { color:var(--muted); } .small { font-size:.85rem; }
+.controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+.controls select { max-width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); min-height:40px; }
+.legend { display:flex; flex-wrap:wrap; gap:8px 14px; font-size:.8rem; color:var(--muted); margin:6px 0 10px; }
+.legend i { display:inline-block; width:14px; height:14px; border-radius:3px; border:1px solid var(--line); vertical-align:-2px; margin-right:4px; }
+.months { display:grid; gap:12px; }
+@media (min-width:760px) { .months { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); } }
+.month h3 { margin:4px 0 6px; font-size:.95rem; }
+.grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:3px; }
+.dow { text-align:center; font-size:.68rem; color:var(--muted); font-weight:600; }
+.cell { position:relative; min-height:46px; border:1px solid var(--line); border-radius:7px; background:#fff; padding:14px 2px 2px; text-align:center; font-weight:700; font-size:.9rem; overflow:hidden; }
+.cell .n { position:absolute; top:2px; left:4px; font-size:.62rem; font-weight:600; color:var(--muted); }
+.cell.we { background:#eef2f7; }
+.cell.locum { background:var(--locum); }
+.cell.bh { background:var(--bh); }
+.cell.bh .n::after { content:" BH"; color:var(--bh-dk); }
+.cell.unfilled { background:var(--red-bg); color:var(--red); }
+.cell.future { background:var(--future); color:var(--muted); font-weight:500; }
+.cell.me { outline:3px solid var(--blue-dk); outline-offset:-3px; }
+.cell.today { box-shadow:inset 0 0 0 2px var(--amber); }
+.upcoming { margin:8px 0 12px; font-size:.9rem; }
+.upcoming span { display:inline-block; background:#eef4fb; border-radius:6px; padding:3px 8px; margin:2px 4px 2px 0; }
+table { border-collapse:collapse; width:100%; font-size:.85rem; }
+th, td { text-align:left; padding:6px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { color:var(--muted); font-weight:600; font-size:.75rem; text-transform:uppercase; letter-spacing:.02em; }
+td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.bar { position:relative; height:8px; background:#e6ebf0; border-radius:4px; overflow:hidden; min-width:70px; }
+.bar b { position:absolute; left:0; top:0; bottom:0; background:var(--blue); border-radius:4px; }
+.bar.done b { background:var(--green); }
+.done-tag { color:var(--green); font-weight:600; } .todo-tag { color:var(--muted); }
+.hbar { display:grid; grid-template-columns:44px 1fr 36px; gap:6px; align-items:center; margin:3px 0; font-size:.85rem; }
+.hbar .track { height:14px; background:#eef2f7; border-radius:4px; overflow:hidden; }
+.hbar .fill { height:100%; background:var(--blue); border-radius:4px; min-width:2px; }
+.hbar .fill.mine { background:var(--blue-dk); }
+.hbar .v { text-align:right; font-variant-numeric:tabular-nums; color:var(--text); }
+.hbar .k { font-weight:600; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-bottom:12px; }
+.tile { background:#f6f8fa; border-radius:10px; padding:10px; }
+.tile .lab { font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.02em; }
+.tile .val { font-size:1.25rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.tile.warn { background:#fff3cd; } .tile.warn .val { color:#8a5a00; }
+.tip { position:fixed; z-index:9; background:#212b32; color:#fff; font-size:.8rem; padding:6px 8px; border-radius:6px; pointer-events:none; max-width:240px; }
+.notes li { font-size:.85rem; margin:2px 0; }
+footer { color:var(--muted); font-size:.8rem; margin-top:10px; }
+.reqinfo { background:#f6f8fa; border-radius:10px; padding:10px 12px; font-size:.88rem; margin-bottom:8px; line-height:1.5; }
+.reqinfo b { font-variant-numeric:tabular-nums; }
+.reqinfo .used { color:var(--green); font-weight:600; } .reqinfo .old { color:#8a5a00; font-weight:600; }
+.cell.req-yes { background:#e3edf8; border-color:#7aa7d6; }
+.cell.req-got { background:var(--blue); color:#fff; border-color:var(--blue); }
+.cell.req-got .n { color:#dfe9f5; }
+.cell.req-no { background:#fff; color:#aab4bd; font-weight:500; }
+.cell .other { display:block; font-size:.62rem; font-weight:600; color:var(--muted); }
+.cell .pm { position:absolute; right:3px; top:1px; font-size:.7rem; font-weight:700; color:var(--green); }
+.cell.req-got .pm { color:#c8f0d4; }
+.lg-off { background:var(--blue) !important; } .lg-avail { background:#e3edf8 !important; border-color:#7aa7d6 !important; } .lg-no { background:#fff !important; }
+.pairmark { color:var(--green); }
+.who-link { background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.who-link b { color:var(--blue); text-decoration:underline; text-underline-offset:2px; }
+</style>
+</head>
+<body>
+<header class="top"><h1>CCOT Consultant Rota Admin</h1><span class="yr" id="yearLabel"></span><button id="lockBtn" hidden>Lock</button></header>
+<main>
+  <section class="gate" id="gate">
+    <h2>Enter the passphrase</h2>
+    <p class="muted small">The rota is stored encrypted. This is the admin dashboard. Use the admin passphrase, not the one shared with consultants.</p>
+    <form id="gateForm">
+      <input id="pw" type="password" autocomplete="current-password" placeholder="Passphrase" autofocus>
+      <label><input type="checkbox" id="remember" checked> Remember on this device</label>
+      <div class="err" id="gateErr"></div>
+      <button type="submit" id="openBtn">Open the rota</button>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <nav class="tabs" id="tabs">
+      <a href="#rota" class="on">Rota</a><a href="#jobplans">Job plans</a><a href="#locum">Locum shifts</a><a href="#summary">Summary</a><a href="#changes">Changes</a><a href="#requests">Requests</a>
+    </nav>
+    <section class="panel" id="rota">
+      <h2>Rota</h2>
+      <div class="controls">
+        <label class="small muted" for="me">Highlight</label>
+        <select id="me"><option value="">nobody</option></select>
+        <button id="todayBtn" style="min-height:40px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:0 10px">Go to today</button>
+      </div>
+      <div class="upcoming" id="upcoming" hidden></div>
+      <div class="legend"><span><i style="background:#fff"></i>job plan</span><span><i style="background:var(--locum)"></i>extra (WLI)</span><span><i style="background:var(--bh)"></i>bank holiday</span><span><i style="background:var(--red-bg)"></i>unfilled</span><span><i style="background:var(--future)"></i>not yet allocated</span></div>
+      <div class="months" id="months"></div>
+      <div id="notesWrap" hidden><h3 class="small muted" style="margin:12px 0 4px">Notes</h3><ul class="notes" id="notes"></ul></div>
+    </section>
+    <section class="panel" id="jobplans">
+      <h2>Job plans</h2>
+      <p class="muted small">Job plan shifts completed against each consultant's annual quota, and extra shifts undertaken this year.</p>
+      <div class="scroll"><table id="jpTable"></table></div>
+    </section>
+    <section class="panel" id="locum">
+      <h2>Locum shifts this year</h2>
+      <p class="muted small" id="locumNote"></p>
+      <div id="locumChart" role="img" aria-label="Locum shifts per consultant"></div>
+    </section>
+    <section class="panel" id="summary">
+      <h2>Summary</h2>
+      <div class="tiles" id="wliTiles"></div>
+      <p class="muted small" id="wliNote"></p>
+      <div class="scroll"><table id="summaryTable"></table></div>
+    </section>
+    <section class="panel" id="changes">
+      <h2>Swaps and changes since publication</h2>
+      <div class="scroll"><table id="changesTable"></table></div>
+    </section>
+    <section class="panel" id="requests">
+      <h2>Availability requests</h2>
+      <p class="muted small">What each consultant asked for, exactly as their code said. Pick a name, or tap a name anywhere on this page.</p>
+      <div class="controls">
+        <select id="reqWho" aria-label="Consultant"></select>
+        <select id="reqWin" aria-label="Booking window"></select>
+        <select id="reqVer" aria-label="Version"></select>
+      </div>
+      <div id="reqInfo" class="reqinfo"></div>
+      <div class="legend" id="reqLegend"><span><i class="lg-off"></i>offered, given to them</span><span><i class="lg-avail"></i>offered, not given to them</span><span><i class="lg-no"></i>not offered</span><span><i style="background:var(--bh)"></i>bank holiday</span><span><b class="pairmark">⇄</b> weekend kept together</span></div>
+      <div class="months" id="reqMonths"></div>
+    </section>
+    <footer id="foot"></footer>
+  </div>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script>
+(() => {
+  'use strict';
+  const $ = (s, el) => (el || document).querySelector(s);
+  const DAY = 86400000;
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const KEY = 'ccot.admin.v1.';
+  const utc = (iso) => { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+  const toIso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const fmt = (iso, o) => new Date(utc(iso)).toLocaleDateString('en-GB', Object.assign({ timeZone: 'UTC' }, o));
+  const gbp = (n) => n == null ? '–' : '£' + Math.round(n).toLocaleString('en-GB');
+  const pct = (v) => v == null ? '–' : Math.round(v * 100) + '%';
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const load = (k) => { try { return localStorage.getItem(KEY + k); } catch (e) { return null; } };
+  const save = (k, v) => { try { if (v == null) localStorage.removeItem(KEY + k); else localStorage.setItem(KEY + k, v); } catch (e) {} };
+
+  // ---- decryption (matches engine/ccot/dashboard.py)
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function decrypt(env, passphrase) {
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(env.salt), iterations: env.iter || 600000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(env.iv) }, key, b64(env.ct));
+    return JSON.parse(new TextDecoder().decode(plain));
+  }
+  async function fetchEnvelope() {
+    const r = await fetch('./payload.enc?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('The rota file is missing (HTTP ' + r.status + '). It may not have been published yet.');
+    return r.json();
+  }
+
+  let data = null;
+  async function unlock(pw, remember) {
+    const btn = $('#openBtn');
+    btn.disabled = true; btn.textContent = 'Opening…';
+    $('#gateErr').textContent = '';
+    try {
+      const env = await fetchEnvelope();
+      data = await decrypt(env, pw);
+      if (remember) save('pw', pw); else save('pw', null);
+      $('#gate').hidden = true; $('#app').hidden = false; $('#lockBtn').hidden = false;
+      render();
+    } catch (e) {
+      $('#gateErr').textContent = /OperationError|decrypt/i.test(String(e.name || e)) ? 'That passphrase did not work.' : (e.message || String(e));
+      save('pw', null);
+    } finally { btn.disabled = false; btn.textContent = 'Open the rota'; }
+  }
+  $('#gateForm').addEventListener('submit', (ev) => { ev.preventDefault(); unlock($('#pw').value, $('#remember').checked); });
+  $('#lockBtn').addEventListener('click', () => { save('pw', null); location.reload(); });
+  const saved = load('pw');
+  if (saved) unlock(saved, true);
+
+  // ---- rendering
+  function consultantsShown() { return data.consultants.filter((c) => c.active || c.shifts > 0); }
+  function render() {
+    $('#yearLabel').textContent = data.year_long;
+    const me = $('#me');
+    me.innerHTML = '<option value="">nobody</option>' + consultantsShown().map((c) => '<option value="' + c.initials + '">' + esc(c.initials + ' · ' + c.name) + '</option>').join('');
+    me.value = load('me') || '';
+    me.onchange = () => { save('me', me.value); renderRota(); };
+    renderRota(); renderJobPlans(); renderLocum(); renderSummary(); renderChanges(); setupRequests();
+    $('#foot').textContent = 'Published ' + new Date(data.generated).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) + '. Admin view: includes WLI costs and each consultant\'s availability requests. Do not share this passphrase with the consultant group.';
+  }
+  function yearBounds() { const y = parseInt(data.year.slice(0, 4), 10); return [Date.UTC(y, 3, 1), Date.UTC(y + 1, 2, 31)]; }
+  function decidedThrough() { const m = data.summary.current.decided_through; return m ? utc(m) : -Infinity; }
+  function renderRota() {
+    const meIni = $('#me').value;
+    const [ys, ye] = yearBounds();
+    const through = decidedThrough();
+    const todayIso = toIso(Date.now());
+    const host = $('#months'); host.innerHTML = '';
+    let cur = ys;
+    const mine = [];
+    while (cur <= ye) {
+      const d = new Date(cur), y = d.getUTCFullYear(), m = d.getUTCMonth();
+      const n = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      const sec = document.createElement('div'); sec.className = 'month'; sec.id = 'm-' + y + '-' + (m + 1);
+      sec.innerHTML = '<h3>' + MONTHS[m] + ' ' + y + '</h3>';
+      const g = document.createElement('div'); g.className = 'grid';
+      ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((t) => { const e = document.createElement('div'); e.className = 'dow'; e.textContent = t; g.appendChild(e); });
+      for (let b = 0; b < (d.getUTCDay() + 6) % 7; b++) g.appendChild(document.createElement('div'));
+      for (let dd = 1; dd <= n; dd++) {
+        const ms = Date.UTC(y, m, dd), iso = toIso(ms);
+        const s = data.rota[iso];
+        const cell = document.createElement('div');
+        let cls = 'cell';
+        if (new Date(ms).getUTCDay() % 6 === 0) cls += ' we';
+        if (data.bank_holidays[iso]) cls += ' bh';
+        let text = '';
+        if (s) {
+          text = s.c;
+          if (s.kind === 'LOCUM') cls += ' locum';
+          if (s.c === meIni) { cls += ' me'; if (iso >= todayIso) mine.push(iso); }
+        } else if (ms <= through) { cls += ' unfilled'; text = '—'; }
+        else { cls += ' future'; }
+        if (iso === todayIso) cls += ' today';
+        cell.className = cls;
+        cell.innerHTML = '<span class="n">' + dd + '</span>' + esc(text);
+        cell.title = fmt(iso, { weekday: 'long', day: 'numeric', month: 'long' }) + (data.bank_holidays[iso] ? ' (' + data.bank_holidays[iso] + ')' : '') + ': ' + (s ? s.c + (s.kind === 'LOCUM' ? ', extra shift' : s.kind === 'BH' ? ', bank holiday shift' : ', job plan') : ms <= through ? 'unfilled' : 'not yet allocated');
+        cell.dataset.tip = cell.title;
+        g.appendChild(cell);
+      }
+      sec.appendChild(g); host.appendChild(sec);
+      cur = Date.UTC(y, m + 1, 1);
+    }
+    const up = $('#upcoming');
+    if (meIni && mine.length) { up.hidden = false; up.innerHTML = '<b>' + esc(meIni) + ' next:</b> ' + mine.slice(0, 8).map((iso) => '<span>' + fmt(iso, { weekday: 'short', day: 'numeric', month: 'short' }) + (data.rota[iso].kind === 'LOCUM' ? ' (extra)' : data.rota[iso].kind === 'BH' ? ' (BH)' : '') + '</span>').join('') + (mine.length > 8 ? ' +' + (mine.length - 8) + ' more' : ''); }
+    else if (meIni) { up.hidden = false; up.innerHTML = '<b>' + esc(meIni) + '</b> has no shifts published from today onwards.'; }
+    else up.hidden = true;
+    const notes = Object.keys(data.notes || {}).sort();
+    $('#notesWrap').hidden = !notes.length;
+    $('#notes').innerHTML = notes.map((k) => '<li><b>w/c ' + fmt(k, { day: 'numeric', month: 'short' }) + ':</b> ' + esc(data.notes[k]) + '</li>').join('');
+  }
+  $('#todayBtn').addEventListener('click', () => {
+    const d = new Date(); const el = document.getElementById('m-' + d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1));
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  function bar(done, quota) {
+    const p = quota ? Math.min(100, Math.round(100 * done / quota)) : (done ? 100 : 0);
+    return '<div class="bar' + (quota && done >= quota ? ' done' : '') + '"><b style="width:' + p + '%"></b></div>';
+  }
+  function renderJobPlans() {
+    const rows = consultantsShown().map((c) => {
+      const okW = c.jp.weekday >= c.quota.weekday, okE = c.jp.weekend >= c.quota.weekend;
+      const status = (okW && okE) ? '<span class="done-tag">✓ complete</span>' : '<span class="todo-tag">' + (Math.max(0, c.quota.weekday - c.jp.weekday) + Math.max(0, c.quota.weekend - c.jp.weekend)) + ' to go</span>';
+      return '<tr><td><button type="button" class="who-link" data-who="' + esc(c.initials) + '"><b>' + esc(c.initials) + '</b><br><span class="muted small">' + esc(c.name) + (c.active ? '' : ' (inactive)') + '</span></button></td>' +
+        '<td class="num">' + c.jp.weekday + ' / ' + c.quota.weekday + bar(c.jp.weekday, c.quota.weekday) + '</td>' +
+        '<td class="num">' + c.jp.weekend + ' / ' + c.quota.weekend + bar(c.jp.weekend, c.quota.weekend) + '</td>' +
+        '<td>' + status + '</td><td class="num">' + c.locum.weekday + '</td><td class="num">' + c.locum.weekend + '</td><td class="num">' + c.locum.bh + '</td><td class="num"><b>' + c.locum.total + '</b></td></tr>';
+    });
+    $('#jpTable').innerHTML = '<thead><tr><th>Consultant</th><th class="num">JP weekday</th><th class="num">JP weekend</th><th>Status</th><th class="num">Extra wd</th><th class="num">Extra we</th><th class="num">BH</th><th class="num">Extra total</th></tr></thead><tbody>' + rows.join('') + '</tbody>';
+  }
+  function renderLocum() {
+    const cs = consultantsShown().slice().sort((a, b) => b.locum.total - a.locum.total || a.initials.localeCompare(b.initials));
+    const max = Math.max(1, ...cs.map((c) => c.locum.total));
+    const total = cs.reduce((s, c) => s + c.locum.total, 0);
+    const meIni = load('me') || '';
+    $('#locumChart').innerHTML = cs.map((c) => '<div class="hbar" data-tip="' + esc(c.name + ': ' + c.locum.weekday + ' weekday, ' + c.locum.weekend + ' weekend, ' + c.locum.bh + ' bank holiday') + '"><span class="k"><button type="button" class="who-link" data-who="' + esc(c.initials) + '"><b>' + esc(c.initials) + '</b></button></span><div class="track"><div class="fill' + (c.initials === meIni ? ' mine' : '') + '" style="width:' + (100 * c.locum.total / max) + '%"></div></div><span class="v">' + c.locum.total + '</span></div>').join('');
+    $('#locumNote').textContent = total + ' extra shifts so far this year across ' + cs.length + ' consultants, average ' + (cs.length ? (total / cs.length).toFixed(1) : '0') + ' each. Bank holiday shifts are included. Differences reflect availability: shifts only go to people who offered the date.';
+  }
+  function renderSummary() {
+    const m = data.summary.current, w = m.wli;
+    const tiles = [
+      ['Extra shifts allocated', w.locum_shifts.total + ' (+' + w.bank_holiday_shifts + ' BH)'],
+      ['WLI spend to date', gbp(w.spend_to_date)],
+      ['Committed this year', gbp(w.committed)],
+      ['Projected for the year', gbp(w.projected)],
+    ];
+    let warn = false;
+    if (w.budget) { tiles.push(['Budget', gbp(w.budget)]); tiles.push(['Projected use of budget', w.budget_pct + '%']); warn = !!w.overspend; }
+    $('#wliTiles').innerHTML = tiles.map(([l, v], i) => '<div class="tile' + (warn && i >= 4 ? ' warn' : '') + '"><div class="lab">' + esc(l) + '</div><div class="val">' + esc(v) + '</div></div>').join('');
+    $('#wliNote').textContent = (warn ? '⚠ Projected spend exceeds the budget. ' : '') + 'WLI bill = extra weekday and weekend shifts at the rate in force on each date (' + gbp(w.rates.weekday.hourly * w.rates.weekday.hours) + ' weekday, ' + gbp(w.rates.weekend.hourly * w.rates.weekend.hours) + ' weekend today). Bank holiday shifts are paid separately and are not in the bill. The projection assumes the rest of the year needs extra shifts at the same rate as the part already allocated.';
+    const years = Object.keys(data.summary.history || {}).sort();
+    if (!years.includes(data.year)) years.push(data.year);
+    const rows = [
+      ['JP weekday shifts', 'jp_weekday_quota', (v) => v], ['JP weekend day shifts', 'jp_weekend_quota', (v) => v], ['JP bank holiday', 'jp_bank_holiday', (v) => v],
+      ['Bank available (budget)', 'budget', gbp], ['Weekday fill rate', 'weekday_fill_rate', pct], ['Weekend fill rate', 'weekend_fill_rate', pct], ['Bank holiday fill rate', 'bank_holiday_fill_rate', pct],
+      ['Weekday fill rate above JP', 'weekday_fill_rate_above_jp', pct], ['Weekend fill rate above JP', 'weekend_fill_rate_above_jp', pct], ['Total WLI bill', 'total_wli_bill', gbp],
+    ];
+    const get = (yr, key) => yr === data.year ? m[key] : (data.summary.history[yr] || {})[key];
+    $('#summaryTable').innerHTML = '<thead><tr><th></th>' + years.map((y) => '<th class="num">' + esc(y) + (y === data.year ? ' (to date)' : '') + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map(([lab, key, f]) => '<tr><td>' + esc(lab) + '</td>' + years.map((y) => { const v = get(y, key); return '<td class="num">' + (v == null ? '–' : esc(f(v))) + '</td>'; }).join('') + '</tr>').join('') + '</tbody>';
+  }
+  function renderChanges() {
+    const ch = (data.changes || []).slice().reverse();
+    if (!ch.length) { $('#changesTable').innerHTML = '<tbody><tr><td class="muted">No swaps or changes yet.</td></tr></tbody>'; return; }
+    const who = (e) => e.event === 'credit' ? esc(e.c + ': ' + (e.n > 0 ? '+' : '') + e.n + ' job plan ' + e.type) : e.event === 'swap' ? esc(e.from_ + ' → ' + e.to) : e.event === 'reclassify' ? esc(e.c + ': ' + e.before + ' → ' + e.after) : esc((e.before && e.before.c ? e.before.c : 'unfilled') + ' → ' + (e.after && e.after.c ? e.after.c : 'unfilled'));
+    $('#changesTable').innerHTML = '<thead><tr><th>Date</th><th>Change</th><th>Who</th><th>Reason</th><th>Logged</th></tr></thead><tbody>' + ch.map((e) => '<tr><td>' + fmt(e.date, { weekday: 'short', day: 'numeric', month: 'short' }) + '</td><td>' + esc(e.event) + '</td><td>' + who(e) + '</td><td>' + esc(e.reason || '') + '</td><td class="muted small">' + esc((e.at || '').slice(0, 10)) + '</td></tr>').join('') + '</tbody>';
+  }
+
+  // ---- availability requests
+  function setupRequests() {
+    const who = $('#reqWho'), win = $('#reqWin'), ver = $('#reqVer');
+    const people = data.consultants.filter((c) => c.active || c.shifts > 0 || (data.requests || {})[c.initials]);
+    who.innerHTML = people.map((c) => '<option value="' + esc(c.initials) + '">' + esc(c.initials + ' · ' + c.name) + ((data.requests || {})[c.initials] ? '' : ' (no codes)') + '</option>').join('');
+    const remembered = load('reqWho');
+    who.value = people.some((c) => c.initials === remembered) ? remembered : ((people[0] && people[0].initials) || '');
+    who.onchange = () => { save('reqWho', who.value); fillWindows(); };
+    win.onchange = fillVersions;
+    ver.onchange = renderRequest;
+    document.addEventListener('click', (ev) => {
+      const b = ev.target.closest('.who-link'); if (!b) return;
+      who.value = b.dataset.who; save('reqWho', who.value); fillWindows();
+      document.querySelectorAll('#tabs a').forEach((x) => x.classList.toggle('on', x.getAttribute('href') === '#requests'));
+      $('#requests').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    fillWindows();
+  }
+  function reqsFor(ini) { return ((data.requests || {})[ini] || []); }
+  function fillWindows() {
+    const rs = reqsFor($('#reqWho').value);
+    const wins = [];
+    rs.forEach((r) => { if (!wins.some((w) => w.window === r.window)) wins.push(r); });
+    $('#reqWin').innerHTML = wins.length ? wins.map((w) => '<option value="' + esc(w.window) + '">' + esc(w.window) + ' (' + fmt(w.start, { day: 'numeric', month: 'short' }) + ' to ' + fmt(w.end, { day: 'numeric', month: 'short', year: 'numeric' }) + ')</option>').join('') : '<option value="">no codes on record</option>';
+    $('#reqWin').disabled = !wins.length;
+    if (wins.length) $('#reqWin').value = wins[wins.length - 1].window;
+    fillVersions();
+  }
+  function fillVersions() {
+    const vs = reqsFor($('#reqWho').value).filter((r) => r.window === $('#reqWin').value);
+    $('#reqVer').innerHTML = vs.length ? vs.map((r, i) => '<option value="' + i + '">' + (r.current ? 'Used: ' : 'Earlier: ') + 'received ' + (r.received ? new Date(r.received).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'unknown') + '</option>').join('') : '<option value="">–</option>';
+    $('#reqVer').disabled = vs.length < 2;
+    const cur = vs.findIndex((r) => r.current);
+    $('#reqVer').value = String(cur >= 0 ? cur : Math.max(0, vs.length - 1));
+    renderRequest();
+  }
+  function renderRequest() {
+    const ini = $('#reqWho').value;
+    const c = data.consultants.find((x) => x.initials === ini);
+    const vs = reqsFor(ini).filter((r) => r.window === $('#reqWin').value);
+    const r = vs[parseInt($('#reqVer').value, 10)];
+    const host = $('#reqMonths'); host.innerHTML = '';
+    if (!r) {
+      $('#reqInfo').innerHTML = '<b>' + esc(c ? c.name : ini) + '</b> has no availability code on record this year. Shifts from before the app was introduced were imported from the spreadsheet, so there is no request to show for them.';
+      $('#reqLegend').hidden = true;
+      return;
+    }
+    $('#reqLegend').hidden = false;
+    const s0 = utc(r.start), n = r.days.length;
+    const pairs = new Set(r.pairs || []);
+    let offered = 0, got = 0, gotNotOffered = 0, we = 0, wd = 0, bh = 0;
+    for (let i = 0; i < n; i++) {
+      const iso = toIso(s0 + i * DAY), s = data.rota[iso];
+      const yes = r.days[i] === '1', mine = s && s.c === ini;
+      if (yes) { offered++; if (data.bank_holidays[iso]) bh++; else if (new Date(s0 + i * DAY).getUTCDay() % 6 === 0) we++; else wd++; }
+      if (mine) { got++; if (!yes) gotNotOffered++; }
+    }
+    $('#reqInfo').innerHTML = '<b>' + esc(c ? c.name : ini) + '</b>, window ' + esc(r.window) + '. ' +
+      (r.current ? '<span class="used">This is the code used for the allocation.</span>' : '<span class="old">An earlier code, later replaced.</span>') + '<br>' +
+      'Received ' + (r.received ? new Date(r.received).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'at an unknown time') + '.<br>' +
+      'Offered <b>' + offered + '</b> days: ' + wd + ' weekdays, ' + we + ' weekend days' + (bh ? ', ' + bh + ' bank holidays' : '') + '. ' +
+      'Weekends to keep together: <b>' + pairs.size + '</b>. ' +
+      'Most shifts wanted this quarter: <b>' + (r.max ? r.max : 'no limit') + '</b>.<br>' +
+      'Allocated <b>' + got + '</b> shifts in this window' + (gotNotOffered ? ', of which <b>' + gotNotOffered + '</b> were not on this request (swaps or overrides, marked *)' : '') + '.';
+    let cur = Date.UTC(new Date(s0).getUTCFullYear(), new Date(s0).getUTCMonth(), 1);
+    const end = s0 + (n - 1) * DAY;
+    while (cur <= end) {
+      const d = new Date(cur), y = d.getUTCFullYear(), m = d.getUTCMonth();
+      const nd = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      const sec = document.createElement('div'); sec.className = 'month';
+      sec.innerHTML = '<h3>' + MONTHS[m] + ' ' + y + '</h3>';
+      const g = document.createElement('div'); g.className = 'grid';
+      ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((tt) => { const e = document.createElement('div'); e.className = 'dow'; e.textContent = tt; g.appendChild(e); });
+      for (let b = 0; b < (d.getUTCDay() + 6) % 7; b++) g.appendChild(document.createElement('div'));
+      for (let dd = 1; dd <= nd; dd++) {
+        const ms = Date.UTC(y, m, dd), iso = toIso(ms), i = Math.round((ms - s0) / DAY);
+        const cell = document.createElement('div');
+        if (i < 0 || i >= n) { cell.className = 'cell future'; cell.innerHTML = '<span class="n">' + dd + '</span>'; g.appendChild(cell); continue; }
+        const yes = r.days[i] === '1', s = data.rota[iso], mine = s && s.c === ini;
+        const wday = new Date(ms).getUTCDay();
+        const sat = wday === 6 ? i : wday === 0 ? i - 1 : -1;
+        const paired = sat >= 0 && pairs.has(sat);
+        let cls = 'cell ' + (mine ? 'req-got' : yes ? 'req-yes' : 'req-no');
+        if (data.bank_holidays[iso]) cls += ' bh';
+        cell.className = cls;
+        let body = '<span class="n">' + dd + '</span>' + (paired ? '<span class="pm" title="weekend kept together">⇄</span>' : '');
+        body += mine ? esc(ini) + (yes ? '' : '*') : (yes ? '✓' : '');
+        if (s && !mine && yes) body += '<span class="other">' + esc(s.c) + '</span>';
+        cell.innerHTML = body;
+        cell.title = fmt(iso, { weekday: 'long', day: 'numeric', month: 'long' }) + ': ' + (yes ? 'offered' : 'not offered') + (paired ? ', weekend kept together' : '') + (s ? '; allocated to ' + s.c : '; not allocated') + (mine && !yes ? ' (not on this request)' : '');
+        g.appendChild(cell);
+      }
+      sec.appendChild(g); host.appendChild(sec);
+      cur = Date.UTC(y, m + 1, 1);
+    }
+  }
+
+  // tabs highlight + tooltips
+  $('#tabs').addEventListener('click', (ev) => { const a = ev.target.closest('a'); if (!a) return; document.querySelectorAll('#tabs a').forEach((x) => x.classList.toggle('on', x === a)); });
+  const tip = $('#tip');
+  document.addEventListener('mouseover', (ev) => { const t = ev.target.closest('[data-tip]'); if (!t) { tip.hidden = true; return; } tip.textContent = t.dataset.tip; tip.hidden = false; });
+  document.addEventListener('mousemove', (ev) => { if (tip.hidden) return; tip.style.left = Math.min(ev.clientX + 12, window.innerWidth - 250) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; });
+  document.addEventListener('mouseout', (ev) => { if (!ev.relatedTarget || !ev.relatedTarget.closest || !ev.relatedTarget.closest('[data-tip]')) tip.hidden = true; });
+})();
+</script>
+</body>
+</html>

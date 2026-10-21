@@ -30,7 +30,7 @@ Run the tests with `engine/.venv/bin/python -m pytest engine/tests`.
 ./ccot allocate 2026-27-Q4         # solve and print the draft
 ./ccot review 2026-27-Q4           # print the saved draft again
 ./ccot accept 2026-27-Q4           # commit the draft into the year
-./ccot publish                     # encrypt the dashboard payload into docs/rota/payload.enc
+./ccot publish                     # encrypt both dashboards: docs/rota/ (consultants) and docs/admin/ (admin)
 git add docs && git commit -m "Publish rota" && git push
 ```
 
@@ -86,3 +86,11 @@ offering a date and still owes job plan shifts for the year, the allowance rises
 count as job plan. Within a window a consultant's first shifts up to the allowance are job plan
 and the rest are locum, in date order. Bank holiday shifts are always extra, count as locum for
 fairness, and are left out of the WLI bill.
+
+## Publishing
+
+`ccot publish` builds both dashboards. It asks for each passphrase once and checks it against
+the one already in use, so a typo is caught straight away. It only asks you to type it twice
+when you are setting a new passphrase. `--only consultant` or `--only admin` publishes one.
+Every code received is kept in the window file, so the admin dashboard can show earlier
+versions of someone's request as well as the one used.

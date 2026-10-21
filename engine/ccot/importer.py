@@ -38,6 +38,10 @@ def import_text(store: Store, wid: str, text: str) -> Dict[str, Any]:
                "available": sum(p.days), "max": p.max_shifts}
         existed = ini in w.setdefault("submissions", {})
         w["submissions"][ini] = sub
+        # Keep every distinct code ever received, as a record of what each person asked for.
+        hist = w.setdefault("history", {}).setdefault(ini, [])
+        if not any(h["code"] == code for h in hist):
+            hist.append(dict(sub))
         (report["replaced"] if existed else report["accepted"]).append({"initials": ini, "available": sum(p.days), "pairs": len(p.pairs), "max": p.max_shifts})
     store.save_window(w)
     return report

@@ -7,7 +7,7 @@ import getpass
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from . import allocate, costing, dashboard, importer
 from . import calendar as cal
@@ -367,19 +367,49 @@ def cmd_export(a, st: Store):
     print("wrote %s" % out)
 
 
+def _passphrase(label: str, env: str, given: Optional[str], existing: Path) -> str:
+    """Ask once if the passphrase opens what is already published; ask twice only when it is new."""
+    pw = os.environ.get(env) or given
+    if pw:
+        return pw
+    while True:
+        pw = getpass.getpass("%s passphrase: " % label)
+        if not pw:
+            continue
+        state = dashboard.opens(existing, pw)
+        if state:
+            print("  matches the %s passphrase already in use" % label)
+            return pw
+        if state is False:
+            print("  this is NOT the %s passphrase currently in use." % label)
+            ans = input("  set it as a new passphrase? Everyone will need the new one. [y/N] ").strip().lower()
+            if ans != "y":
+                print("  try again")
+                continue
+        else:
+            print("  no %s dashboard published yet; this sets its passphrase" % label)
+        if pw == getpass.getpass("  again, to confirm the new passphrase: "):
+            return pw
+        print("  those did not match; try again")
+
+
 def cmd_publish(a, st: Store):
     label = a.year or _current_year()
-    pw = os.environ.get("CCOT_PASSPHRASE") or a.passphrase
-    if not pw:
-        pw = getpass.getpass("dashboard passphrase (the one shared with consultants): ")
-        if pw != getpass.getpass("again: "):
-            print("passphrases differ", file=sys.stderr)
-            sys.exit(1)
-    out = Path(a.out) if a.out else REPO / "docs" / "rota" / "payload.enc"
+    targets = [("consultant", "CONSULTANT dashboard (shared with all consultants)", "CCOT_PASSPHRASE", REPO / "docs" / "rota" / "payload.enc"),
+               ("admin", "ADMIN dashboard (you and senior leadership)", "CCOT_ADMIN_PASSPHRASE", REPO / "docs" / "admin" / "payload.enc")]
+    if a.only:
+        targets = [t for t in targets if t[0] == a.only]
+    chosen = {}
+    for view, what, env, path in targets:
+        chosen[view] = _passphrase(what, env, a.passphrase if a.only else None, path)
+    if chosen.get("consultant") and chosen.get("consultant") == chosen.get("admin"):
+        print("error: the admin passphrase must be different from the consultant one, or every consultant could open the admin dashboard", file=sys.stderr)
+        sys.exit(1)
     sw = None if a.no_bump else REPO / "docs" / "sw.js"
-    payload = dashboard.publish(st, label, pw, out, sw)
-    print("wrote %s (%d consultants, %d shifts). Service worker %s." % (out, len(payload["consultants"]), len(payload["rota"]), "left alone" if a.no_bump else "version bumped"))
-    print("next: commit and push docs/ to publish:\n  git -C \"%s\" add docs && git -C \"%s\" commit -m \"Publish rota %s\" && git -C \"%s\" push" % (REPO, REPO, label, REPO))
+    for view, what, env, path in targets:
+        payload = dashboard.publish(st, label, chosen[view], path, sw, view=view)
+        print("wrote %s dashboard: %s (%d consultants, %d shifts)" % (view, path.relative_to(REPO), len(payload["consultants"]), len(payload["rota"])))
+    print("next: push it:\n  git add docs && git commit -m \"Publish rota %s\" && git push" % label)
 
 
 # ---------------------------------------------------------------- parser
@@ -506,10 +536,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out")
     s.set_defaults(fn=cmd_export)
 
-    s = sub.add_parser("publish", help="build and encrypt the dashboard payload into docs/rota/")
+    s = sub.add_parser("publish", help="build and encrypt both dashboards: consultant (docs/rota/) and admin (docs/admin/)")
     s.add_argument("--year")
-    s.add_argument("--out")
-    s.add_argument("--passphrase", help="(or set CCOT_PASSPHRASE; otherwise you are prompted)")
+    s.add_argument("--only", choices=["consultant", "admin"], help="publish just one of the two dashboards")
+    s.add_argument("--passphrase", help="with --only (or set CCOT_PASSPHRASE / CCOT_ADMIN_PASSPHRASE; otherwise you are prompted)")
     s.add_argument("--no-bump", action="store_true", help="do not change the service worker version")
     s.set_defaults(fn=cmd_publish)
     return p

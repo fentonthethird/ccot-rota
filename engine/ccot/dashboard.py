@@ -13,7 +13,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -113,6 +113,47 @@ def build_payload(store: Store, label: str) -> Dict[str, Any]:
     }
 
 
+def build_consultant_payload(store: Store, label: str) -> Dict[str, Any]:
+    """What every consultant sees: the rota (with job plan / extra colouring), job plan progress,
+    week notes and the change log. No locum totals, money, budget or availability requests."""
+    full = build_payload(store, label)
+    consultants = [{"initials": c["initials"], "name": c["name"], "active": c["active"], "quota": c["quota"],
+                    "jp": c["jp"], "complete": c["complete"], "shifts": c["shifts"]} for c in full["consultants"]]
+    return {
+        "version": 1, "view": "consultant", "generated": full["generated"], "year": label, "year_long": full["year_long"],
+        "admin": {"name": full["admin"].get("name")},
+        "consultants": consultants, "rota": full["rota"], "unfilled": full["unfilled"], "notes": full["notes"],
+        "bank_holidays": full["bank_holidays"], "changes": full["changes"],
+        "decided_through": full["summary"]["current"]["decided_through"],
+    }
+
+
+def build_admin_payload(store: Store, label: str) -> Dict[str, Any]:
+    """Everything, plus every availability request each consultant sent for each window this year."""
+    full = build_payload(store, label)
+    requests: Dict[str, List[Dict[str, Any]]] = {}
+    for wid in store.window_ids():
+        w = store.window(wid)
+        if w.get("year") != label:
+            continue
+        hist = dict(w.get("history") or {})
+        for ini, sub in (w.get("submissions") or {}).items():  # windows from before history was kept
+            hist.setdefault(ini, [sub])
+        used = {ini: s.get("code") for ini, s in (w.get("submissions") or {}).items()}
+        for ini, versions in hist.items():
+            for v in versions:
+                requests.setdefault(ini, []).append({
+                    "window": wid, "start": w["start"], "end": w["end"], "deadline": w.get("deadline"),
+                    "received": v.get("received"), "days": v.get("days"), "pairs": v.get("pairs", []),
+                    "max": v.get("max"), "available": v.get("available"), "current": v.get("code") == used.get(ini),
+                })
+    for ini in requests:
+        requests[ini].sort(key=lambda r: (r["start"], r["received"] or ""))
+    full["view"] = "admin"
+    full["requests"] = requests
+    return full
+
+
 def derive_key(passphrase: str, salt: bytes, iterations: int = PBKDF2_ITER) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, iterations, dklen=32)
 
@@ -131,8 +172,22 @@ def decrypt(envelope: Dict[str, Any], passphrase: str) -> bytes:
     return AESGCM(key).decrypt(base64.b64decode(envelope["iv"]), base64.b64decode(envelope["ct"]), None)
 
 
-def publish(store: Store, label: str, passphrase: str, out: Path, sw_path: Optional[Path] = None) -> Dict[str, Any]:
-    payload = build_payload(store, label)
+BUILDERS = {"consultant": build_consultant_payload, "admin": build_admin_payload, "full": build_payload}
+
+
+def opens(envelope_path: Path, passphrase: str) -> Optional[bool]:
+    """True if passphrase decrypts the file already there, False if not, None if there is no file."""
+    if not envelope_path.exists():
+        return None
+    try:
+        decrypt(json.loads(envelope_path.read_text(encoding="utf-8")), passphrase)
+        return True
+    except Exception:
+        return False
+
+
+def publish(store: Store, label: str, passphrase: str, out: Path, sw_path: Optional[Path] = None, view: str = "consultant") -> Dict[str, Any]:
+    payload = BUILDERS[view](store, label)
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     env = encrypt(data, passphrase)
     out.parent.mkdir(parents=True, exist_ok=True)

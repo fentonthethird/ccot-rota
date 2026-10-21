@@ -30,7 +30,7 @@ Run the tests with `engine/.venv/bin/python -m pytest engine/tests`.
 ./ccot allocate 2026-27-Q4         # solve and print the draft
 ./ccot review 2026-27-Q4           # print the saved draft again
 ./ccot accept 2026-27-Q4           # commit the draft into the year
-./ccot publish                     # encrypt both dashboards: docs/rota/ (consultants) and docs/admin/ (admin)
+./ccot publish                     # encrypt both dashboards: docs/ccotrota/ (consultants) and docs/ccotrota/admin/ (admin)
 git add docs && git commit -m "Publish rota" && git push
 ```
 

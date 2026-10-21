@@ -1,7 +1,7 @@
 /* Service worker: precaches the app shell so the app opens offline once it has loaded.
    Bump VERSION on every deploy so installed copies pick up the new files. */
 const PREFIX = 'ccot-live-';  // other sites on this origin use other prefixes; never touch their caches
-const VERSION = PREFIX + '20261021-234245';
+const VERSION = PREFIX + '20261021-234909';
 const SHELL = [
   './', './index.html', './app.css', './app.js', './codec.js', './calendar.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png'
@@ -23,7 +23,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   const url = new URL(req.url);
   // The dashboard payload changes on every publish: always try the network first for it.
-  if (/\/(rota|admin)\//.test(url.pathname)) {
+  if (/\/(ccotrota|rota|admin)(\/|$)/.test(url.pathname)) {
     event.respondWith(fetch(req).then((res) => {
       const copy = res.clone();
       caches.open(VERSION).then((c) => c.put(req, copy));

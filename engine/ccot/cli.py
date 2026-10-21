@@ -395,8 +395,8 @@ def _passphrase(label: str, env: str, given: Optional[str], existing: Path) -> s
 
 def cmd_publish(a, st: Store):
     label = a.year or _current_year()
-    targets = [("consultant", "CONSULTANT dashboard (shared with all consultants)", "CCOT_PASSPHRASE", REPO / "docs" / "rota" / "payload.enc"),
-               ("admin", "ADMIN dashboard (you and senior leadership)", "CCOT_ADMIN_PASSPHRASE", REPO / "docs" / "admin" / "payload.enc")]
+    targets = [("consultant", "CONSULTANT dashboard (shared with all consultants)", "CCOT_PASSPHRASE", REPO / "docs" / "ccotrota" / "payload.enc"),
+               ("admin", "ADMIN dashboard (you and senior leadership)", "CCOT_ADMIN_PASSPHRASE", REPO / "docs" / "ccotrota" / "admin" / "payload.enc")]
     if a.only:
         targets = [t for t in targets if t[0] == a.only]
     chosen = {}
@@ -537,7 +537,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out")
     s.set_defaults(fn=cmd_export)
 
-    s = sub.add_parser("publish", help="build and encrypt both dashboards: consultant (docs/rota/) and admin (docs/admin/)")
+    s = sub.add_parser("publish", help="build and encrypt both dashboards: consultant (docs/ccotrota/) and admin (docs/ccotrota/admin/)")
     s.add_argument("--year")
     s.add_argument("--only", choices=["consultant", "admin"], help="publish just one of the two dashboards")
     s.add_argument("--passphrase", help="with --only (or set CCOT_PASSPHRASE / CCOT_ADMIN_PASSPHRASE; otherwise you are prompted)")

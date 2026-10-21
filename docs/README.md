@@ -30,12 +30,13 @@ format is documented at the top of that file.
 
 ## Dashboards
 
-Two encrypted dashboards, each with its own passphrase. Both are built by `ccot publish`.
+Two encrypted dashboards, each with its own passphrase, at https://www.pickmyrota.com/ccotrota and
+https://www.pickmyrota.com/ccotrota/admin. The old `rota/` and `admin/` addresses forward to them. Both are built by `ccot publish`.
 
 | Page | For | Shows |
 |---|---|---|
-| `rota/` "CCOT Consultant Rota" | all consultants | rota by month (job plan and extra colouring), job plan progress, notes, swaps and changes |
-| `admin/` "CCOT Consultant Rota Admin" | rota lead and senior leadership | everything above plus locum counts, Summary and WLI spend, and every availability code each consultant sent |
+| `ccotrota/` "CCOT Consultant Rota" | all consultants | rota by month (job plan and extra colouring), job plan progress, notes, swaps and changes |
+| `ccotrota/admin/` "CCOT Consultant Rota Admin" | rota lead and senior leadership | everything above plus locum counts, Summary and WLI spend, and every availability code each consultant sent |
 
 The consultant file is built separately and contains no locum totals, money or availability
 requests, so the consultant passphrase cannot reveal them. The admin passphrase must differ.

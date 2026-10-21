@@ -1,7 +1,7 @@
 """Build the dashboard payload and encrypt it for the static site.
 
 Envelope: JSON {v, kdf, iter, salt, iv, ct} with base64 fields. Key = PBKDF2-HMAC-SHA256(passphrase,
-salt, iter) 32 bytes; ciphertext = AES-256-GCM(iv, payload JSON). docs/rota/index.html decrypts the
+salt, iter) 32 bytes; ciphertext = AES-256-GCM(iv, payload JSON). docs/ccotrota/index.html and docs/ccotrota/admin/index.html decrypt the
 same envelope with WebCrypto.
 """
 from __future__ import annotations

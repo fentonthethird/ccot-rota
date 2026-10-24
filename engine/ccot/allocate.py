@@ -54,8 +54,9 @@ def build_problem(store: Store, w: Dict[str, Any], time_limit: float = 60.0) -> 
         h = Y.holder(y, d)
         if h:
             prior[d] = h
+    contract = {ini: sum(R.quota(R.get(store, ini), w["year"])) for ini in consultants}
     return Problem(dates=open_dates, consultants=consultants, available=available, pairs=pairs, max_shifts=max_shifts,
-                   allowance=allowance, locum_ytd=locum_ytd, prior=prior, time_limit=time_limit)
+                   allowance=allowance, locum_ytd=locum_ytd, prior=prior, contract=contract, time_limit=time_limit)
 
 
 def classify(result: Result, consultants: List[str]) -> Dict[dt.date, str]:

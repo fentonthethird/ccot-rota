@@ -75,17 +75,21 @@ in strict order, fixing each optimum before moving to the next:
 1. maximise shifts filled (dates nobody offered are reported as unfillable);
 2. maximise job plan shifts delivered, each consultant up to their allowance for the window;
 3. minimise weekend pairs split against a "both days together" request;
-4. minimise the highest year-to-date locum count, then the sum of squared counts;
+4. share extra (locum) shifts as evenly as possible within the quarter: first the highest number
+   anyone gets, then the sum of squares. Bank holidays are left out of this and shared evenly on
+   their own;
 5. minimise runs longer than four consecutive days;
 6. minimise second shifts for one person in the same week;
-7. a fixed tie-break so the same inputs always give the same draft.
+7. tie-breaks for people level for the quarter: fewest extra shifts since 1 April (bank holidays
+   included), then the biggest annual job plan quota (weekday plus weekend);
+8. a fixed tie-break so the same inputs always give the same draft.
 
 A consultant's allowance for a window is the pro-rata share of the job plan shifts they still owe
 (`ccot window show`, override with `ccot window allowance`). When a consultant is the only person
 offering a date and still owes job plan shifts for the year, the allowance rises so those shifts
 count as job plan. Within a window a consultant's first shifts up to the allowance are job plan
 and the rest are locum, in date order. Bank holiday shifts are always extra, count as locum for
-fairness, and are left out of the WLI bill.
+the year total, and are left out of the WLI bill.
 
 ## Publishing
 

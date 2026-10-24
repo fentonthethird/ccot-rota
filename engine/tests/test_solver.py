@@ -143,3 +143,35 @@ def test_no_maximum_means_only_availability_limits():
     ds = days(7)
     res = solve(problem(ds, {"A": ds}, {"A": (5, 2)}, max_shifts={}))
     assert all(res.assignment[d] == "A" for d in ds)
+
+
+def test_extra_shifts_are_shared_within_the_quarter_not_the_year():
+    ds = days(2)  # Mon, Tue
+    # A has had far more extra shifts this year, but within this quarter both start level, so one each.
+    res = solve(problem(ds, {"A": ds, "B": ds}, {"A": (0, 0), "B": (0, 0)}, ytd={"A": 10, "B": 0}))
+    assert sorted(res.assignment.values()) == ["A", "B"]
+
+
+def test_level_for_the_quarter_goes_to_fewest_since_april_then_biggest_contract():
+    d = MON
+    res = solve(problem([d], {"A": [d], "B": [d]}, {"A": (0, 0), "B": (0, 0)}, ytd={"A": 5, "B": 2}))
+    assert res.assignment[d] == "B"
+    p = problem([d], {"A": [d], "B": [d]}, {"A": (0, 0), "B": (0, 0)}, ytd={"A": 3, "B": 3})
+    p.contract = {"A": 12, "B": 17}
+    assert solve(p).assignment[d] == "B"
+    p.contract = {"A": 17, "B": 12}
+    assert solve(p).assignment[d] == "A"
+
+
+def test_bank_holidays_do_not_count_towards_the_quarter_share():
+    bh, wd = D("2027-01-01"), D("2027-01-05")
+    # Only A can do the weekday, so A has 1 extra shift this quarter. The bank holiday is shared
+    # on its own, so it goes on the year total (A 0, B 10) to A rather than "evening up" to B.
+    res = solve(problem([bh, wd], {"A": [bh, wd], "B": [bh]}, {"A": (0, 0), "B": (0, 0)}, ytd={"A": 0, "B": 10}))
+    assert res.assignment == {bh: "A", wd: "A"}
+
+
+def test_bank_holidays_are_shared_evenly_among_themselves():
+    gf, em = D("2027-03-26"), D("2027-03-29")  # Good Friday, Easter Monday
+    res = solve(problem([gf, em], {"A": [gf, em], "B": [gf, em]}, {"A": (0, 0), "B": (0, 0)}, ytd={"A": 0, "B": 30}))
+    assert sorted(res.assignment.values()) == ["A", "B"]

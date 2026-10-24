@@ -4,11 +4,14 @@ Stages, each solved to optimality and then fixed before the next:
   1  maximise shifts filled
   2  maximise job plan shifts delivered (each consultant up to their window allowance)
   3  minimise weekend pairs split against the consultant's request
-  4a minimise the highest year-to-date locum count
-  4b minimise the sum of squared year-to-date locum counts (spreads the rest evenly)
+  4a minimise the highest number of extra (locum) shifts anyone gets this quarter, bank holidays aside
+  4b minimise the sum of squares of those quarter counts (as level as possible)
+  4c share this quarter's bank holidays the same way, on their own
   5  minimise runs of more than `max_run` consecutive days
   6  minimise extra shifts for one consultant in the same week (spreads shifts out)
-  7  deterministic tie-break so the same inputs always give the same draft
+  7a tie-break: extra shifts go to whoever has fewest since 1 April (bank holidays included)
+  7b tie-break: then to whoever has the biggest annual job plan quota
+  8  deterministic tie-break so the same inputs always give the same draft
 Hard constraints: only dates a consultant marked available; one consultant per date; never more
 shifts in the window than the consultant's own stated maximum, when they gave one.
 """
@@ -32,6 +35,7 @@ class Problem:
     allowance: Dict[str, Dict[str, int]]      # {c: {"weekday": n, "weekend": n}}
     locum_ytd: Dict[str, int]                 # locum shifts (incl. bank holidays) already this year
     prior: Dict[dt.date, str] = field(default_factory=dict)  # holders of dates just before the window
+    contract: Dict[str, int] = field(default_factory=dict)  # annual job plan quota, weekday + weekend
     max_shifts: Dict[str, int] = field(default_factory=dict)  # most new shifts each consultant will take; absent = no limit
     max_run: int = 4
     time_limit: float = 60.0
@@ -129,31 +133,50 @@ def solve(p: Problem) -> Result:
                 m.Add(v >= x[c, sun] - x[c, sat])
                 viol.append((c, sat, v))
     run("3", "weekend pairs split", sum(v for _, _, v in viol) if viol else 0, False)
-    # 4 fairness on year-to-date locum counts
+    # 4 fairness within this quarter
+    def level(name: str, desc: str, counts: Dict[str, object], ubs: Dict[str, int]) -> None:
+        vs = {}
+        for c in p.consultants:
+            v = m.NewIntVar(0, max(0, ubs[c]), "%s_%s" % (name, c))
+            m.Add(v == counts[c])
+            vs[c] = v
+        top = max(ubs.values()) if ubs else 0
+        if not vs or top == 0:
+            stages.append(Stage(name, "highest " + desc, 0, "TRIVIAL", True))
+            stages.append(Stage(name + "+", "sum of squared " + desc, 0, "TRIVIAL", True))
+            return
+        vmax = m.NewIntVar(0, top, name + "_max")
+        for c in p.consultants:
+            m.Add(vmax >= vs[c])
+        run(name, "highest " + desc, vmax, False)
+        sq = []
+        for c in p.consultants:
+            s = m.NewIntVar(0, ubs[c] * ubs[c], "%s_sq_%s" % (name, c))
+            m.AddMultiplicationEquality(s, [vs[c], vs[c]])
+            sq.append(s)
+        run(name + "+", "sum of squared " + desc, sum(sq), False)
+
+    q_locum: Dict[str, object] = {}
+    q_bh: Dict[str, object] = {}
+    q_ub: Dict[str, int] = {}
+    bh_ub: Dict[str, int] = {}
+    for c in p.consultants:
+        bh_terms = [x[c, d] for d in p.dates if (c, d) in x and cal.day_type(d) == cal.BH]
+        q_locum[c] = (n[c, cal.WEEKDAY] - jp[c, cal.WEEKDAY]) + (n[c, cal.WEEKEND] - jp[c, cal.WEEKEND])
+        q_bh[c] = sum(bh_terms) if bh_terms else 0
+        q_ub[c] = sum(1 for d in p.available.get(c, ()) if d in offers and cal.day_type(d) != cal.BH)
+        bh_ub[c] = len(bh_terms)
+    level("4a", "extra shifts this quarter (bank holidays aside)", q_locum, q_ub)
+    level("4c", "bank holidays this quarter", q_bh, bh_ub)
+    # year-to-date totals, used for the tie-break and the report
     L: Dict[str, cp_model.IntVar] = {}
     ubs = {}
     for c in p.consultants:
-        bh_terms = [x[c, d] for d in p.dates if (c, d) in x and cal.day_type(d) == cal.BH]
-        expr = p.locum_ytd.get(c, 0) + (n[c, cal.WEEKDAY] - jp[c, cal.WEEKDAY]) + (n[c, cal.WEEKEND] - jp[c, cal.WEEKEND]) + (sum(bh_terms) if bh_terms else 0)
         ub = p.locum_ytd.get(c, 0) + len(p.available.get(c, ()))
         ubs[c] = ub
         v = m.NewIntVar(0, ub, "L_%s" % c)
-        m.Add(v == expr)
+        m.Add(v == p.locum_ytd.get(c, 0) + q_locum[c] + q_bh[c])
         L[c] = v
-    if L:
-        lmax = m.NewIntVar(0, max(ubs.values()), "Lmax")
-        for c in p.consultants:
-            m.Add(lmax >= L[c])
-        run("4a", "highest year-to-date locum count", lmax, False)
-        sq = []
-        for c in p.consultants:
-            s = m.NewIntVar(0, ubs[c] * ubs[c], "sq_%s" % c)
-            m.AddMultiplicationEquality(s, [L[c], L[c]])
-            sq.append(s)
-        run("4b", "sum of squared locum counts", sum(sq), False)
-    else:
-        stages.append(Stage("4a", "highest year-to-date locum count", 0, "TRIVIAL", True))
-        stages.append(Stage("4b", "sum of squared locum counts", 0, "TRIVIAL", True))
     # 5 consecutive days
     runs = []
     span_len = p.max_run + 1
@@ -187,11 +210,24 @@ def solve(p: Problem) -> Result:
             m.Add(v >= sum(terms) - 1)
             clus.append(v)
     run("6", "extra shifts for one person in the same week", sum(clus) if clus else 0, False)
-    # 7 deterministic tie-break
+    # 7 tie-breaks among people level for the quarter
+    if L:
+        sqy = []
+        for c in p.consultants:
+            s = m.NewIntVar(0, ubs[c] * ubs[c], "ysq_%s" % c)
+            m.AddMultiplicationEquality(s, [L[c], L[c]])
+            sqy.append(s)
+        run("7a", "extra shifts since 1 April (squared, lower first)", sum(sqy), False)
+        weighted = [int(p.contract.get(c, 0)) * (q_locum[c] + q_bh[c]) for c in p.consultants if not isinstance(q_locum[c] + q_bh[c], int)]
+        run("7b", "extra shifts weighted by job plan quota (higher first)", sum(weighted) if weighted else 0, True)
+    else:
+        stages.append(Stage("7a", "extra shifts since 1 April", 0, "TRIVIAL", True))
+        stages.append(Stage("7b", "extra shifts weighted by job plan quota", 0, "TRIVIAL", True))
+    # 8 deterministic tie-break
     ci = {c: i for i, c in enumerate(p.consultants)}
     di = {d: i for i, d in enumerate(p.dates)}
     tie = sum(((ci[c] * 31 + di[d] * 17) % 23 + 1) * v for (c, d), v in x.items()) if x else 0
-    run("7", "tie-break", tie, False)
+    run("8", "tie-break", tie, False)
 
     assignment: Dict[dt.date, Optional[str]] = {}
     for d in p.dates:

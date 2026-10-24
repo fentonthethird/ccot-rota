@@ -2,7 +2,8 @@
 
 Stages, each solved to optimality and then fixed before the next:
   1  maximise shifts filled
-  2  maximise job plan shifts delivered (each consultant up to their window allowance)
+  2  maximise job plan shifts delivered (each consultant up to what they owe of each type, and in
+     total no more than their job plan limit for the quarter)
   3  minimise weekend pairs split against the consultant's request
   4a minimise the highest number of extra (locum) shifts anyone gets this quarter, bank holidays aside
   4b minimise the sum of squares of those quarter counts (as level as possible)
@@ -32,7 +33,7 @@ class Problem:
     consultants: List[str]
     available: Dict[str, Set[dt.date]]
     pairs: Dict[str, Set[dt.date]]            # flagged Saturdays per consultant
-    allowance: Dict[str, Dict[str, int]]      # {c: {"weekday": n, "weekend": n}}
+    allowance: Dict[str, Dict[str, int]]      # {c: {"weekday": n, "weekend": n, "total": n}}; total optional
     locum_ytd: Dict[str, int]                 # locum shifts (incl. bank holidays) already this year
     prior: Dict[dt.date, str] = field(default_factory=dict)  # holders of dates just before the window
     contract: Dict[str, int] = field(default_factory=dict)  # annual job plan quota, weekday + weekend
@@ -96,6 +97,10 @@ def solve(p: Problem) -> Result:
                 m.Add(v == 0)
             jp[c, t] = v
 
+    for c in p.consultants:
+        tot = p.allowance.get(c, {}).get("total")
+        if tot is not None:
+            m.Add(jp[c, cal.WEEKDAY] + jp[c, cal.WEEKEND] <= max(0, int(tot)))
     stages: List[Stage] = []
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = p.time_limit

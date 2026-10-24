@@ -37,7 +37,7 @@ def test_links_carry_identity_window_and_shifts_owed(store):
     q = {k: v[0] for k, v in parse_qs(urlparse(links["AW"]).query).items()}
     assert q == {"c": "AW", "k": w["tokens"]["AW"], "n": "Alan", "w": "2026-27-Q4", "s": "2027-01-01", "e": "2027-03-31", "d": "2026-11-30", "jw": "9", "je": "1"}
     assert links["AW"].startswith("https://example.github.io/ccot-rota/?")
-    assert W.windows_left(w) == 1 and W.default_allowance(store, w, R.get(store, "AW")) == {"weekday": 9, "weekend": 1}
+    assert W.default_allowance(store, w, R.get(store, "AW")) == {"weekday": 9, "weekend": 1, "total": 10}  # Jan-Mar: no limit
     q1 = W.create(store, "2027-28-Q1", D("2027-04-01"), D("2027-06-30"))
     assert W.windows_left(q1) == 4
 
@@ -135,29 +135,51 @@ def test_import_status_heatmap_allocate_accept_and_publish(store, tmp_path):
         dashboard.decrypt(env, "wrong passphrase")
 
 
-def test_sole_offer_front_loads_job_plan_beyond_the_pro_rata_allowance(store):
+def test_quarter_job_plan_limit(store):
+    add_people(store, {"AW": ("Alan Williams", 10, 2), "XW": ("Ximena Watson", 10, 2), "KW": ("Kate Williams", 3, 0)})
+    q1 = W.create(store, "2026-27-Q1", D("2026-04-01"), D("2026-06-30"))
+    q3 = W.create(store, "2026-27-Q3", D("2026-10-01"), D("2026-12-31"))
+    q4 = W.create(store, "2026-27-Q4", D("2027-01-01"), D("2027-03-31"))
+    aw, kw = R.get(store, "AW"), R.get(store, "KW")
+    assert W.quarter_jp_limit(store, q1, aw) == 6      # 50% of 12
+    assert W.quarter_jp_limit(store, q3, aw) == 9      # 80% of 12 = 9.6, rounded down
+    assert W.quarter_jp_limit(store, q4, aw) is None   # last quarter: finish what is owed
+    assert W.quarter_jp_limit(store, q1, kw) == 1      # 50% of 3 = 1.5, rounded down
+    assert W.allowance(store, q1, aw) == {"weekday": 10, "weekend": 2, "total": 6}
+
+
+def test_beyond_the_quarter_limit_shifts_are_locum_even_when_only_they_offered(store):
     add_people(store, {"AW": ("Alan Williams", 10, 2), "XW": ("Ximena Watson", 10, 2)})
     w = W.create(store, "2026-27-Q1", D("2026-04-01"), D("2026-06-30"))
-    assert W.windows_left(w) == 4 and W.default_allowance(store, w, R.get(store, "AW")) == {"weekday": 3, "weekend": 1}
-    start = D(w["start"])
-    aw_days = [D("2026-04-07"), D("2026-04-14"), D("2026-04-21"), D("2026-04-28"), D("2026-05-05"), D("2026-05-12")]
-    aw = codec.encode("AW", start, [1 if start + dt.timedelta(days=i) in aw_days else 0 for i in range(W.length(w))], token=w["tokens"]["AW"])
-    xw = codec.encode("XW", start, [1 if (start + dt.timedelta(days=i)).weekday() == 2 else 0 for i in range(W.length(w))], token=w["tokens"]["XW"])
-    importer.import_text(store, w["id"], aw + "\n" + xw)
-    p = allocate.build_problem(store, store.window(w["id"]))
-    assert p.allowance["AW"] == {"weekday": 6, "weekend": 1}   # raised from 3: nobody else can do those six Tuesdays
-    assert p.allowance["XW"] == {"weekday": 10, "weekend": 1}  # 13 Wednesdays are XW's alone: raised, but never beyond the 10 still owed
+    start, n = D(w["start"]), W.length(w)
+    tuesdays = [start + dt.timedelta(days=i) for i in range(n) if (start + dt.timedelta(days=i)).weekday() == 1][:10]
+    aw = codec.encode("AW", start, [1 if start + dt.timedelta(days=i) in tuesdays else 0 for i in range(n)], token=w["tokens"]["AW"])
+    importer.import_text(store, w["id"], aw)
     draft = allocate.run(store, w["id"], time_limit=30)
-    assert draft["consultants"]["AW"]["jp_window"]["weekday"] == 6 and draft["consultants"]["AW"]["locum_window"] == 0
+    c = draft["consultants"]["AW"]
+    assert c["allocated"] == 10                                     # every day only AW offered is still covered
+    assert c["jp_window"]["weekday"] + c["jp_window"]["weekend"] == 6  # but only 50% of 12 is job plan
+    assert c["locum_window"] == 4
+    kinds = [draft["kinds"][d.isoformat()] for d in tuesdays]
+    assert kinds == ["JP"] * 6 + ["LOCUM"] * 4                     # the first ones in date order are job plan
+
+
+def test_last_quarter_lets_everyone_finish(store):
+    add_people(store, {"AM": ("Ambroise Muchembeld", 10, 2)})
+    w = W.create(store, "2026-27-Q4", D("2027-01-01"), D("2027-03-31"))
+    start, n = D(w["start"]), W.length(w)
+    importer.import_text(store, w["id"], codec.encode("AM", start, [1] * n, token=w["tokens"]["AM"]))
+    draft = allocate.run(store, w["id"], time_limit=30)
+    assert draft["consultants"]["AM"]["jp_window"] == {"weekday": 10, "weekend": 2}
 
 
 def test_manual_allowance_override_is_respected(store):
     add_people(store, {"AW": ("Alan Williams", 10, 2)})
     w = W.create(store, "2026-27-Q1", D("2026-04-01"), D("2026-06-30"))
-    W.set_allowance(store, w["id"], "AW", weekday=8)
-    assert W.allowance(store, store.window(w["id"]), R.get(store, "AW")) == {"weekday": 8, "weekend": 1}
-    W.set_allowance(store, w["id"], "AW", weekday=99)
-    assert W.allowance(store, store.window(w["id"]), R.get(store, "AW"))["weekday"] == 10  # never more than is owed
+    W.set_allowance(store, w["id"], "AW", total=8)
+    assert W.allowance(store, store.window(w["id"]), R.get(store, "AW"))["total"] == 8
+    W.set_allowance(store, w["id"], "AW", weekday=3)
+    assert W.allowance(store, store.window(w["id"]), R.get(store, "AW")) == {"weekday": 3, "weekend": 2, "total": 5}
 
 
 def test_shift_limit_travels_from_code_to_draft(store):

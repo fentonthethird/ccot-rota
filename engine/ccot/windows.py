@@ -70,26 +70,56 @@ def remaining_quota(store: Store, w: Dict[str, Any], c: Dict[str, Any]) -> Dict[
     return {"weekday": max(0, qw - done["weekday"]), "weekend": max(0, qe - done["weekend"])}
 
 
+# Most job plan shifts anyone can be given within one quarter, as a percentage of their annual
+# job plan (weekday + weekend days), rounded down. None = no limit: the last quarter lets everyone
+# finish what they owe. Quarters run April-June (1), July-September (2), October-December (3),
+# January-March (4).
+QUARTER_JP_LIMIT_PCT = {1: 50, 2: 50, 3: 80, 4: None}
+
+
+def quarter_jp_limit(store: Store, w: Dict[str, Any], c: Dict[str, Any]) -> Optional[int]:
+    """Job plan shifts this consultant may still be given in this window's quarter, or None for no limit.
+    Job plan shifts already recorded earlier in the same quarter count towards the limit."""
+    start = dt.date.fromisoformat(w["start"])
+    pct = QUARTER_JP_LIMIT_PCT[cal.quarter_of(start)]
+    if pct is None:
+        return None
+    qw, qe = R.quota(c, w["year"])
+    limit = (qw + qe) * pct // 100
+    q_start = dt.date(start.year, ((start.month - 1) // 3) * 3 + 1, 1)
+    y = store.year(w["year"])
+    before = start - dt.timedelta(days=1)
+    done_this_quarter = 0
+    if q_start <= before:
+        upto_before = Y.jp_done(y, c["initials"], upto=before)
+        upto_q = Y.jp_done(y, c["initials"], upto=q_start - dt.timedelta(days=1))
+        done_this_quarter = sum(upto_before.values()) - sum(upto_q.values())
+    return max(0, limit - done_this_quarter)
+
+
 def default_allowance(store: Store, w: Dict[str, Any], c: Dict[str, Any]) -> Dict[str, int]:
-    """Pro-rata share of what is still owed, spread over the windows left in the year."""
+    """Job plan this consultant can be given in the window: what they still owe of each type, and in
+    total no more than the quarter limit."""
     rem = remaining_quota(store, w, c)
-    n = windows_left(w)
-    return {k: int(math.ceil(v / n)) for k, v in rem.items()}
+    owed = rem["weekday"] + rem["weekend"]
+    lim = quarter_jp_limit(store, w, c)
+    return {"weekday": rem["weekday"], "weekend": rem["weekend"], "total": owed if lim is None else min(owed, lim)}
 
 
 def allowance(store: Store, w: Dict[str, Any], c: Dict[str, Any]) -> Dict[str, int]:
-    """Allowance actually used: the admin's override if set, else the pro-rata default, never more than owed."""
-    rem = remaining_quota(store, w, c)
-    base = default_allowance(store, w, c)
+    """Allowance actually used: the default, narrowed by any admin override, never more than owed."""
+    out = default_allowance(store, w, c)
     ov = (w.get("allowances") or {}).get(c["initials"]) or {}
-    out = {}
     for k in ("weekday", "weekend"):
-        v = ov.get(k)
-        out[k] = min(rem[k], int(v) if v is not None else base[k])
+        if ov.get(k) is not None:
+            out[k] = min(out[k], int(ov[k]))
+    if ov.get("total") is not None:
+        out["total"] = int(ov["total"])
+    out["total"] = min(out["total"], out["weekday"] + out["weekend"])
     return out
 
 
-def set_allowance(store: Store, wid: str, initials: str, weekday: Optional[int] = None, weekend: Optional[int] = None) -> Dict[str, Any]:
+def set_allowance(store: Store, wid: str, initials: str, weekday: Optional[int] = None, weekend: Optional[int] = None, total: Optional[int] = None) -> Dict[str, Any]:
     w = store.window(wid)
     ini = R._norm(initials)
     R.get(store, ini)
@@ -98,6 +128,8 @@ def set_allowance(store: Store, wid: str, initials: str, weekday: Optional[int] 
         a["weekday"] = int(weekday)
     if weekend is not None:
         a["weekend"] = int(weekend)
+    if total is not None:
+        a["total"] = int(total)
     store.save_window(w)
     return w
 

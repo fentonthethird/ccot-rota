@@ -37,15 +37,6 @@ def build_problem(store: Store, w: Dict[str, Any], time_limit: float = 60.0) -> 
     for ini in consultants:
         c = R.get(store, ini)
         a = W.allowance(store, w, c)
-        rem = W.remaining_quota(store, w, c)
-        # Sole-offer rule: when nobody else can cover a date, the shift is job plan even beyond
-        # the pro-rata allowance, as long as the annual quota is still owed.
-        forced = {"weekday": 0, "weekend": 0}
-        for d in open_dates:
-            if offers[d] == [ini] and cal.day_type(d) in forced:
-                forced[cal.day_type(d)] += 1
-        for t in ("weekday", "weekend"):
-            a[t] = min(rem[t], max(a[t], forced[t]))
         allowance[ini] = a
         locum_ytd[ini] = Y.locum_done(y, ini, upto=start - dt.timedelta(days=1))["total"]
     prior = {}
@@ -112,7 +103,7 @@ def run(store: Store, wid: str, time_limit: float = 60.0) -> Dict[str, Any]:
     stages = [{"name": s.name, "objective": s.objective, "value": s.value, "status": s.status, "optimal": s.optimal} for s in res.stages]
     satisfied = {
         "1_all_offered_dates_filled": len(res.unfillable) == sum(1 for d in p.dates if not res.offers[d]),
-        "2_all_allowances_met": all(res.jp[c][t] >= p.allowance[c][t] for c in p.consultants for t in ("weekday", "weekend")),
+        "2_all_allowances_met": all(res.jp[c]["weekday"] + res.jp[c]["weekend"] >= p.allowance[c]["total"] for c in p.consultants),
         "3_all_pairs_honoured": not res.pair_violations,
         "5_no_long_runs": next((s.value == 0 for s in res.stages if s.name == "5"), True),
         "6_no_two_in_a_week": next((s.value == 0 for s in res.stages if s.name == "6"), True),

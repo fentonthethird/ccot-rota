@@ -152,11 +152,15 @@ def cmd_window(a, st: Store):
             rem = W.remaining_quota(st, w, c)
             ov = (w.get("allowances") or {}).get(c["initials"]) or {}
             sub = (w.get("submissions") or {}).get(c["initials"])
-            rows.append([c["initials"], "yes" if c.get("active", True) else "no", "%d/%d" % (rem["weekday"], rem["weekend"]), "%d/%d" % (al["weekday"], al["weekend"]), "set" if ov else "", sub["available"] if sub else "-", (sub.get("max") or "none") if sub else "-"])
-        print(_table(rows, ["ini", "active", "owed wd/we", "allowance wd/we", "override", "offered", "max wanted"]))
-        print("allowance = what they still owe, spread over the %d window(s) left this year; change with `ccot window allowance`" % W.windows_left(w))
+            lim = W.quarter_jp_limit(st, w, c)
+            rows.append([c["initials"], "yes" if c.get("active", True) else "no", "%d/%d" % (rem["weekday"], rem["weekend"]), "no limit" if lim is None else str(lim), str(al["total"]), "set" if ov else "", sub["available"] if sub else "-", (sub.get("max") or "none") if sub else "-"])
+        print(_table(rows, ["ini", "active", "owed wd/we", "JP limit this quarter", "JP allowed now", "override", "offered", "max wanted"]))
+        pct = W.QUARTER_JP_LIMIT_PCT[cal.quarter_of(dt.date.fromisoformat(w["start"]))]
+        print("JP limit this quarter: %s (Apr-Jun and Jul-Sep 50%%, Oct-Dec 80%% of the annual job plan, rounded down; Jan-Mar no limit)." % (
+            "none, everyone can finish what they owe" if pct is None else "%d%% of the annual job plan" % pct))
+        print("Shifts beyond it are locum. Change one person's with `ccot window allowance ID INI --total N`.")
     elif a.action == "allowance":
-        W.set_allowance(st, a.id, a.initials, a.weekday, a.weekend)
+        W.set_allowance(st, a.id, a.initials, a.weekday, a.weekend, a.total)
         print("allowance override saved for %s in %s" % (a.initials.upper(), a.id))
     elif a.action == "deadline":
         w = st.window(a.id)
@@ -275,10 +279,10 @@ def _print_review(wid: str, d: Dict[str, Any], st: Store):
         rows.append([ini, c["offered"], c.get("max") or "", c["allocated"],
                      "%d+%d=%d/%d" % (c["jp_before"]["weekday"], c["jp_window"]["weekday"], c["jp_after"]["weekday"], c["quota"]["weekday"]),
                      "%d+%d=%d/%d" % (c["jp_before"]["weekend"], c["jp_window"]["weekend"], c["jp_after"]["weekend"], c["quota"]["weekend"]),
-                     "%d/%d" % (c["allowance"]["weekday"], c["allowance"]["weekend"]),
+                     "%d" % c["allowance"].get("total", c["allowance"]["weekday"] + c["allowance"]["weekend"]),
                      "%d+%d=%d" % (c["locum_before"], c["locum_window"], c["locum_after"])])
     print("\nper consultant (JP columns: before + this window = after / annual quota):")
-    print(_table(rows, ["ini", "offered", "max", "got", "JP weekday", "JP weekend", "allow wd/we", "locum before+new=after"]))
+    print(_table(rows, ["ini", "offered", "max", "got", "JP weekday", "JP weekend", "JP allowed", "locum before+new=after"]))
     missing = [ini for ini, c in d["consultants"].items() if not c["submitted"] and c["active"]]
     if missing:
         print("\nno code received (treated as unavailable): " + ", ".join(missing))
@@ -461,6 +465,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--deadline", type=_date)
     s.add_argument("--weekday", type=int)
     s.add_argument("--weekend", type=int)
+    s.add_argument("--total", type=int, help="allowance: most job plan shifts in total for this window")
     s.set_defaults(fn=cmd_window)
 
     s = sub.add_parser("links", help="print the personalised links for a window")

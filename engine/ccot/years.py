@@ -36,12 +36,17 @@ def jp_done(year: Dict[str, Any], initials: str, upto: Optional[dt.date] = None)
     out = {"weekday": 0, "weekend": 0}
     for s in shifts_for(year, initials, upto):
         if s["kind"] == JP:
-            t = cal.day_type(dt.date.fromisoformat(s["date"]))
-            if t in out:
-                out[t] += 1
+            out[jp_type(dt.date.fromisoformat(s["date"]))] += 1
     for cr in credits_for(year, initials, upto):
         out[cr["type"]] += int(cr["n"])
     return out
+
+
+def jp_type(d: dt.date) -> str:
+    """Which job plan quota a job plan shift on this date counts towards. A bank holiday the
+    consultant asked to count as job plan counts as a weekend day."""
+    t = cal.day_type(d)
+    return cal.WEEKEND if t == cal.BH else t
 
 
 def credits_for(year: Dict[str, Any], initials: str, upto: Optional[dt.date] = None) -> List[Dict[str, Any]]:
@@ -91,8 +96,8 @@ def log(year: Dict[str, Any], event: str, **fields: Any) -> None:
 def set_shift(year: Dict[str, Any], d: dt.date, initials: str, kind: str, source: str, note: Optional[str] = None) -> None:
     if kind not in KINDS:
         raise ValueError("kind must be one of %s" % ", ".join(KINDS))
-    if cal.day_type(d) == cal.BH and kind != BH:
-        kind = BH
+    if cal.day_type(d) == cal.BH and kind == LOCUM:
+        kind = BH  # a bank holiday paid as extra is recorded as a bank holiday shift
     year.setdefault("shifts", {})[_iso(d)] = {"c": initials, "kind": kind, "src": source, "note": note}
     if _iso(d) in year.get("unfilled", []):
         year["unfilled"].remove(_iso(d))
@@ -142,8 +147,8 @@ def reclassify(store: Store, label: str, d: dt.date, kind: str, reason: str) -> 
         raise ValueError("%s is not filled" % _iso(d))
     if kind not in (JP, LOCUM):
         raise ValueError("kind must be JP or LOCUM")
-    if cal.day_type(d) == cal.BH:
-        raise ValueError("a bank holiday shift is always a bank holiday shift")
+    if cal.day_type(d) == cal.BH and kind == LOCUM:
+        kind = BH  # back to a bank holiday paid as extra
     before = s["kind"]
     s["kind"] = kind
     s["note"] = reason
@@ -176,10 +181,10 @@ def counts(year: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
         c = out.setdefault(s["c"], {"jp_weekday": 0, "jp_weekend": 0, "locum_weekday": 0, "locum_weekend": 0, "bh": 0, "total": 0})
         t = cal.day_type(dt.date.fromisoformat(k))
         c["total"] += 1
-        if s["kind"] == BH or t == cal.BH:
+        if s["kind"] == JP:
+            c["jp_" + jp_type(dt.date.fromisoformat(k))] += 1
+        elif s["kind"] == BH or t == cal.BH:
             c["bh"] += 1
-        elif s["kind"] == JP:
-            c["jp_" + t] += 1
         else:
             c["locum_" + t] += 1
     for cr in year.get("jp_credits", []):

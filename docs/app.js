@@ -308,9 +308,18 @@
     if (c.bh) parts.push(c.bh + ' bank holiday' + (c.bh === 1 ? '' : 's'));
     $('#codeSummary').textContent = 'You have marked ' + parts.join(', ') + ' available' + (c.together ? ', with ' + c.together + ' weekend' + (c.together === 1 ? '' : 's') + ' kept together' : '') + '.' + (c.wd + c.we + c.bh === 0 ? ' Sending this tells ' + ADMIN_NAME + ' you cannot do any dates this quarter.' : (maxWanted ? ' You want no more than ' + maxWanted + ' shift' + (maxWanted === 1 ? '' : 's') + ' in total.' : ' No limit on the number of shifts.'));
     $('#codeText').textContent = code;
-    $('#codeNote').textContent = 'Send it to ' + ADMIN_NAME + (id.d ? ' by ' + fmt(utc(id.d), { weekday: 'long', day: 'numeric', month: 'long' }) : '') + '. If you change anything later, make a new code and send that. The latest code counts.';
+    $('#codeNote').textContent = 'Send it to ' + ADMIN_NAME + (id.d ? ' by ' + fmt(utc(id.d), { weekday: 'long', day: 'numeric', month: 'long' }) : '') + '. If you change anything later, make a new code and send that. The latest code counts.' +
+      (c.bh ? (c.bh === 1
+        ? ' You have marked a bank holiday. It is paid as an extra shift unless you tell ' + ADMIN_NAME + ' you would like it to count as a job plan weekend day.'
+        : ' You have marked ' + c.bh + ' bank holidays. They are paid as extra shifts unless you tell ' + ADMIN_NAME + ' you would like any of them to count as job plan weekend days.') +
+        ' "Email to ' + ADMIN_NAME + '" adds a line for this that you can keep or delete.' : '');
     const subject = 'CCOT availability ' + id.c + ' ' + windowLabel();
-    const body = 'Hi ' + ADMIN_NAME + ',\n\nMy CCOT availability code for ' + windowLabel() + ':\n\n' + code + '\n\n' + (id.n || id.c);
+    const bhMarked = [];
+    for (let i = 0; i < len; i++) if (days[i] && isBH(i)) bhMarked.push(fmt(dateAt(i), { weekday: 'short', day: 'numeric', month: 'short' }));
+    const bhLine = bhMarked.length
+      ? '\n\nBank holidays: I would like these to count as job plan weekend days instead of extra shifts (delete this paragraph if not, or remove any dates that should stay as extra): ' + bhMarked.join(', ') + '.'
+      : '';
+    const body = 'Hi ' + ADMIN_NAME + ',\n\nMy CCOT availability code for ' + windowLabel() + ':\n\n' + code + bhLine + '\n\n' + (id.n || id.c);
     $('#mailBtn').href = 'mailto:' + ADMIN_EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     $('#mailBtn').textContent = 'Email to ' + ADMIN_NAME;
     $('#shareBtn').hidden = !(navigator.share);

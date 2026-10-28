@@ -66,7 +66,7 @@ def year_metrics(store: Store, label: str) -> Dict[str, Any]:
 
     w = costing.wli(store, label)
     return {
-        "jp_weekday_quota": qw, "jp_weekend_quota": qe, "jp_bank_holiday": 0,
+        "jp_weekday_quota": qw, "jp_weekend_quota": qe, "jp_bank_holiday": per_type[cal.BH]["jp"],
         "budget": w["budget"],
         "weekday_fill_rate": rate(cal.WEEKDAY), "weekend_fill_rate": rate(cal.WEEKEND), "bank_holiday_fill_rate": rate(cal.BH),
         "weekday_fill_rate_above_jp": above(cal.WEEKDAY), "weekend_fill_rate_above_jp": above(cal.WEEKEND),

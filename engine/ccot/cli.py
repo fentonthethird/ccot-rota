@@ -322,7 +322,10 @@ def cmd_kind(a, st: Store):
     label = cal.job_plan_year(a.date)
     y = Y.reclassify(st, label, a.date, a.kind.upper(), a.reason)
     s = y["shifts"][a.date.isoformat()]
-    print("%s: %s is now %s. Logged." % (a.date, s["c"], s["kind"]))
+    extra = ""
+    if cal.day_type(a.date) == cal.BH:
+        extra = " (a bank holiday counted as a job plan weekend day)" if s["kind"] == Y.JP else " (a bank holiday paid as an extra shift)"
+    print("%s: %s is now %s%s. Logged." % (a.date, s["c"], s["kind"], extra))
 
 
 def cmd_credit(a, st: Store):
@@ -527,7 +530,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--reason", required=True)
     s.set_defaults(fn=cmd_credit)
 
-    s = sub.add_parser("kind", help="reclassify a held shift as JP or LOCUM (logged)")
+    s = sub.add_parser("kind", help="reclassify a held shift as JP or LOCUM (logged); JP on a bank holiday counts as a job plan weekend day")
     s.add_argument("date", type=_date)
     s.add_argument("kind", choices=["JP", "LOCUM", "jp", "locum"])
     s.add_argument("--reason", required=True)

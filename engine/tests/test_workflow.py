@@ -266,3 +266,26 @@ def test_consultant_and_admin_dashboards(store, tmp_path):
     assert dashboard.opens(cdir / "payload.enc", "leadership") is False
     assert dashboard.opens(tmp_path / "nothing.enc", "x") is None
     assert "requests" in json.loads(dashboard.decrypt(json.loads((adir / "payload.enc").read_text()), "leadership"))
+
+
+def test_bank_holiday_can_count_as_a_job_plan_weekend_day(store):
+    add_people(store, {"XW": ("Ximena Watson", 10, 2)})
+    y = store.year("2026-27")
+    Y.set_shift(y, D("2027-03-29"), "XW", Y.LOCUM, "allocate")          # Easter Monday, allocated as extra
+    store.save_year(y)
+    y = store.year("2026-27")
+    assert y["shifts"]["2027-03-29"]["kind"] == Y.BH
+    assert Y.locum_done(y, "XW")["bh"] == 1 and Y.jp_done(y, "XW") == {"weekday": 0, "weekend": 0}
+
+    Y.reclassify(store, "2026-27", D("2027-03-29"), Y.JP, "XW asked for this bank holiday to count as job plan")
+    y = store.year("2026-27")
+    assert y["shifts"]["2027-03-29"]["kind"] == Y.JP
+    assert Y.jp_done(y, "XW") == {"weekday": 0, "weekend": 1}            # counts as a weekend day
+    assert Y.locum_done(y, "XW")["total"] == 0
+    assert Y.counts(y)["XW"]["jp_weekend"] == 1 and Y.counts(y)["XW"]["bh"] == 0
+    s = store.settings()
+    assert costing.shift_cost(s, D("2027-03-29"), Y.JP) == 0.0
+    assert dashboard.year_metrics(store, "2026-27")["jp_bank_holiday"] == 1
+
+    Y.reclassify(store, "2026-27", D("2027-03-29"), Y.LOCUM, "changed mind")
+    assert store.year("2026-27")["shifts"]["2027-03-29"]["kind"] == Y.BH    # back to a bank holiday shift

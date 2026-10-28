@@ -102,3 +102,14 @@ the one already in use, so a typo is caught straight away. It only asks you to t
 when you are setting a new passphrase. `--only consultant` or `--only admin` publishes one.
 Every code received is kept in the window file, so the admin dashboard can show earlier
 versions of someone's request as well as the one used.
+
+## Bank holidays as job plan
+
+Bank holidays are allocated as extra shifts. A consultant can ask, in the email with their code,
+for a bank holiday to count as one of their job plan weekend days instead. After accepting the
+allocation, record it with:
+
+    ./ccot kind 2027-03-29 JP --reason "XW asked for Easter Monday to count as job plan"
+
+It then counts towards their weekend job plan, not their extra shifts, and not the WLI bill.
+`./ccot kind DATE LOCUM` puts it back.
